@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.babylonjs.com/v7.34.1/babylon.js"></script>
+  <meta charset="UTF-8">
+  <style>
+    .title{
+        font-family: Arial, Helvetica, sans-serif;
+        text-align: center;
+        font-size: 35px;
+    }
+    .field{
+        background-color: grey;
+        padding: 20px;
+        border-radius: 10px;
+        border-style: double;
+        border-width:5px;
+        border-color:black;
+    }
+    canvas {
+        margin: 0;
+        padding: 0;
+        width: 60%;
+        height: 60%;     
+        font-size: 0;
+    }
+    .render-canvas{
+      text-align: center;
+    }
+    .slice-canvas{
+      text-align: center;
+    } 
+    .canvas{
+        text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="title">Optimal Cube Shapes</h1>
+
+  <div class="field">
+    <form id="parameters">
+        <select name="shape" id="shape" type="shape">
+        <option value="none">List of common shapes</option>
+        <option value="sphere">Sphere</option>
+        <option value="ellipse">3D ellipse</option>
+        </select>
+    </form>
+    <div id="specifications"></div>
+  </div>
+
+  <div class="render-canvas">
+      <canvas id="render-canvas"></canvas>
+  </div>
+
+  <div id="information" class = "field"></div>
+
+  <div class="slice-canvas">
+      <canvas id="slice-canvas" width="600px" height="600px" style="width: 40%; height: 40%; border: 1px solid black;">
+      </canvas>
+  </div>
+
+  <form id="dataForm">
+    <input type="text" id="userInput" placeholder="Enter message">
+    <button type="submit">Send to Server</button>
+  </form>
+
+  <script>
+    const ctx = document.getElementById("slice-canvas").getContext('2d');
+    ctx.fillRect(0, 0, 10, 10)
+
+    let shape = document.getElementById("shape");
+    let specifications = document.getElementById("specifications");
+    let volume = 0;
+    let surface = 0;
+    let speech = "";
+    let mode = "none";
+
+    specifications.addEventListener("submit", function(e) {
+      if(mode == "sphere"){
+          e.preventDefault();
+          let radius = e.target.querySelector("#radius").value.trim();
+          let parity = e.target.querySelector("#parity").value.trim();
+          sphere(radius, parity);
+      }
+      if(mode == "ellipse"){
+          e.preventDefault();
+          let width = e.target.querySelector("#width").value.trim();
+          let length = e.target.querySelector("#length").value.trim();
+          let height = e.target.querySelector("#height").value.trim();
+          let parity = e.target.querySelector("#parity").value.trim();
+          ellipse(width, length, height, parity);
+      }
+    });
+
+    shape.addEventListener("change", function () {
+      specifications.innerHTML = "";
+      if (this.value == "sphere") {
+        mode = "sphere";
+        specifications.innerHTML = `
+          <form id="parameters" novalidate>
+            <label for="radius">Radius:</label>
+            <input type="text" id="radius" name="radius" required>
+            <label for="parity">0 (Even) or 1 (Odd)?:</label>
+            <input type="text" id="parity" name="parity" required>
+            <button type="submit">Generate</button>
+          </form>
+        `;
+      } else if(this.value == "ellipse"){
+          mode = "ellipse";
+            specifications.innerHTML = `
+            <form id="parameters">
+              <label for="width">width: </label>
+              <input type="text" id="width" name="width" required>
+              <label for="length">length:</label>
+              <input type="text" id="length" name="length" required>
+              <label for="height">height:</label>
+              <input type="text" id="height" name="height" required>
+              <label for="parity">0 (Even) or 1 (Odd)?: </label>
+              <input type="text" id="parity" name="parity" required>
+              <button type="submit">Generate</button>
+            </form>
+            `;
+        }
+    });
+
+    function displayInformation(speech){
+      information.innerHTML = speech;
+    }
+
+    // Babylon startup stuff
+    const canvas = document.getElementById("render-canvas");
+    const engine = new BABYLON.Engine(canvas);
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.9, 0.9, 0.9);
+    function renderLoop() {
+    scene.render();
+    }
+    engine.runRenderLoop(renderLoop);
+    const camera = new BABYLON.ArcRotateCamera(
+    "camera",
+    Math.PI / 2,
+    Math.PI / 4,
+    5,
+    new BABYLON.Vector3(0, 0, 0),
+    scene
+    );
+    camera.attachControl(canvas, true);
+
+    if('ontouchstart' in window || navigator.maxTouchPoints == 0){
+    canvas.addEventListener("wheel", function (event) {
+    event.preventDefault();
+    }, { passive: false });}
+
+    // Cubes!!!
+
+    let cubes = []
+    
+    const boxMaterial = new BABYLON.StandardMaterial("material", scene);
+    boxMaterial.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+    const hl = new BABYLON.HighlightLayer("hl", scene);
+
+    function cube(x, y, z){
+        cubes.push(BABYLON.Mesh.CreateBox("box", 1, scene))
+        cubes[cubes.length - 1].material = boxMaterial;
+        cubes[cubes.length - 1].renderOutline = true;
+        cubes[cubes.length - 1].outlineColor = BABYLON.Color3.Black();
+        cubes[cubes.length - 1].enableEdgesRendering();
+        cubes[cubes.length - 1].edgesWidth = 1.0;
+        cubes[cubes.length - 1].edgesColor = new BABYLON.Color3(0, 0, 0);
+        cubes[cubes.length - 1].position.x = x;
+        cubes[cubes.length - 1].position.y = y;
+        cubes[cubes.length - 1].position.z = z;
+    }
+
+    let map = []
+    let anchorPoints = []
+
+    // SPHERE!!
+
+    function volumeQuad(x, y, z){
+        if(x == 0){
+          volume += 2
+          if(y != 0){
+            volume += 2
+          }
+        } else if (z == 0){
+          volume += 2
+          if(y != 0){
+            volume += 2
+          }
+        } else {
+          volume += 4
+
+        if (y != 0){
+          volume += 4
+        }
+
+        }
+    }
+
+    function quad(x, y, z){
+
+      /*
+          This is for odd spheres. The line of symetry goes directory through a block, causing it to be drawn twice. If a coordinate is zero, special procedures
+          must be used to prevent cubes from being drawn on top of each other.
+      */
+
+        if(x == 0){
+          cube(x, y, z);
+          cube(x, y, -1 * z);
+          surface += 2
+          if(y != 0){
+            cube(x, -1 * y, z);
+            cube(x, -1 * y, -1 * z);
+            surface += 2
+          }
+        } else if (z == 0){
+          cube(x, y, z);
+          cube(-1 * x, y, z);
+          surface += 2
+          if(y != 0){
+            cube(x, -1 * y, z);
+            cube(-1 * x, -1 * y, z);
+            surface += 2
+          }
+        } else {
+          cube(x, y, z);
+          cube(-1 * x, y, z);
+          cube(x, y, -1 * z);
+          cube(-1 * x, y, -1 * z);
+          surface += 4
+
+        if (y != 0){
+          cube(x, -1 * y, z);
+          cube(-1 * x, -1 * y, z);
+          cube(x, -1 * y, -1 * z);
+          cube(-1 * x, -1 * y, -1 * z);
+          surface += 4
+        }
+
+        }
+    }
+
+    function evenQuad(x, y, z){
+
+      /*
+          This is for even sphere where the line of symetry goes in between two cubes. When I mirror cubes, I move them over one to create the even symetry.
+          Otherwise this just creates a normal odd sphere.
+      */
+
+        cube(x, y, z);
+        cube(-1 * x - 1, y, z);
+        cube(x, y, -1 * z - 1);
+        cube(-1 * x - 1, y, -1 * z - 1);
+
+        cube(x, -1 * y - 1, z);
+        cube(-1 * x - 1, -1 * y - 1, z);
+        cube(x, -1 * y - 1, -1 * z - 1);
+        cube(-1 * x - 1, -1 * y - 1, -1 * z - 1);
+
+        surface += 8
+
+    }
+
+    /*
+      In a nutshell, the sphere function works by checking every single corner of each cube to see if it is less than the radius using the equation
+      x^2 + y^2 + z^2 <= r^2. Each successful cube placement is inserted into the map[] array for later optimization.
+
+      This function only calculates one eighth of the sphere, the quad() function mirrors the cube across all other "wedges" of the sphere. 
+      Every coordinate is at some point multiplied by -1, and in even spheres 1 will also be added as well.
+    */
+
+    function sphere(radius, parity){
+      surface = 0;
+      volume = 0;
+      // filling the map array with 0's
+      map = new Array(radius * radius * radius).fill(0);
+      // Getting rid of all pre existing cubes from other functions
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
+      if(parity == "1"){
+        // The seed cube
+        cube(0, 0, 0);
+        // cap is the radius of each circle, and is recalculated depending on the y value of the circle. Right now it's zero. 0.5 is a very common number because
+        //each cube has a side length of 1, and the point (0, 0, 0) is at the very center of the cube at (0, 0, 0).
+        let cap = Math.floor(Math.sqrt(radius*radius -(0.5*0.5)))
+        for(y = 0; y <= radius; y++){
+          // recalculating cap
+          cap = Math.floor(Math.sqrt(radius*radius -((y + 0.5)*(y + 0.5))))
+          for(x = 0; x <= radius; x++){
+            for(z = 0; z <= radius; z++){
+              // this is the heart of the sphere function, and applies the formula mentioned at the top of the sphere function.
+              if((x + 0.5)*(x + 0.5) + (y + 0.5)*(y + 0.5) + (z + 0.5)*(z + 0.5) <= radius*radius){
+                volumeQuad(x,y,z);
+                map[y * (radius * radius) + x * radius + z] = 1;
+              }
+            }
+          }
+        }
+        /*
+          Rendering every single cube is very resource intensive, so I only spawn cubes that are on the outside of the sphere. I do this by checking every single
+          cube to see if one of their sides has no neighbor. I only check in three directions because we are technically not working with a sphere, but a more
+          of a rounded wedge. This means some of the cubes are missed, but I will get them later.
+        */
+        for(y = radius; y >= 0; y--){
+          // this cap calculation looks like it doesn't do anything, but if you touch it, holes start showing up in the sides of the sphere.
+          cap = Math.floor(Math.sqrt(radius*radius -((y + 0.5)*(y + 0.5))))
+          for(x = radius; x >= 0; x--){
+            for(z = radius; z >= 0; z--){
+              if(map[y * (radius * radius) + (x + 1) * radius + z] == 0 
+              || map[y * (radius * radius) + x * radius + (z + 1)] == 0 
+              || map[(y + 1) * (radius * radius) + x * radius + z] == 0){
+                // I have no idea why, but the sphere generates with strange wing structures on two sides of the sphere. Good new is that they only generate at
+                // the limits of the map[] array, so I can just ignore them. This is why x and z values equal to radius are excluded.
+                if(map[y * (radius * radius) + x * radius + z] === 1 && x != radius && z != radius){
+                  // I change the value to 2 to stop this function from potentially calling quad() on the same cube.
+                  map[y * (radius * radius) + x * radius + z] = 2
+                  quad(x, y, z);
+                }
+              }
+            }
+          }
+        }
+        /*
+          For whatever reason the sphere generates with a hole in each of the poles of the sphere. So all three of these nested for loops fill in the holes
+          in every direction. We exclude cubes where two coordinates are equal to 0 to prevent these "cap" cubes from being drawn multiple times. We still need to 
+          draw in the "cap" cubes, so I just manually draw them instead.
+        */
+        for(x = 0; x <= cap; x++){
+          for(z = 0; z <= cap; z++){
+            if(map[cap * (radius * radius) + x * radius + z] == 1 && !(x == 0 && z == 0)){
+              quad(x, cap, z);
+            }
+          }
+        }
+
+        cube(0, cap, 0);
+        cube(0, -1 * cap, 0);
+        cube(cap, 0, 0);
+        cube(-1 * cap, 0, 0);
+        cube(0, 0, cap);
+        cube(0, 0, -1 * cap);
+
+        for(y = 0; y <= cap; y++){
+          for(z = 0; z <= cap; z++){
+            if(map[y * (radius * radius) + cap * radius + z] == 1 && !(z == 0 && y == 0)){
+              quad(cap, y, z);
+            }
+          }
+        }
+        for(y = 0; y <= cap; y++){
+          for(x = 0; x <= cap; x++){
+            if(map[y * (radius * radius) + x * radius + cap] == 1 && !(x == 0 && y == 0)){
+              quad(x, y, cap);
+            }
+          }
+        }
+        volume = volume - (2 * (radius - 0.5));
+        surface += 6
+      } else if (parity == "0"){
+        // nucleus of the even parity spheres. the cube at (0, 0, 0) is drawn twice. Turning it black, so I know where it is.
+        cube(0, 0, 0);
+        cube(0, 0, 0);
+        cube(-1, 0, 0);
+        cube(0, -1, 0);
+        cube(-1, -1, 0);
+        cube(0, 0, -1);
+        cube(-1, 0, -1);
+        cube(0, -1, -1);
+        cube(-1, -1, -1);
+
+        let cap = Math.floor(Math.sqrt(radius*radius -(0 * 0)))
+        for(y = 0; y <= radius; y++){
+          cap = Math.floor(Math.sqrt(radius*radius -((y)*(y))))
+          for(x = 0; x <= radius; x++){
+            for(z = 0; z <= radius; z++){
+              if((x)*(x) + (y)*(y) + (z)*(z) <= radius*radius - 2){
+                map[y * (radius * radius) + x * radius + z] = 1;
+                volume += 1
+              }
+            }
+          }
+        }
+        for(y = radius; y >= 0; y--){
+          cap = Math.floor(Math.sqrt(radius*radius -((y)*(y))))
+          for(x = radius; x >= 0; x--){
+            for(z = radius; z >= 0; z--){
+              if(map[y * (radius * radius) + (x + 1) * radius + z] == 0 
+              || map[y * (radius * radius) + x * radius + (z + 1)] == 0 
+              || map[(y + 1) * (radius * radius) + x * radius + z] == 0){
+                if(map[y * (radius * radius) + x * radius + z] == 1 && x != radius && z != radius){
+                  map[y * (radius * radius) + x * radius + z] = 2
+                  evenQuad(x, y, z);
+                }
+              }
+            }
+          }
+        }
+
+        /*
+          For whatever reason the sphere generates with a hole in each of the poles of the sphere. So all three of these nested for loops fill in the holes
+          in every direction. We exclude cubes where two coordinates are equal to 0 to prevent these "cap" cubes from being drawn multiple times. We still need to 
+          draw in the "cap" cubes, so I just manually draw them instead.
+        */
+       
+       cap = cap - 1
+
+        evenQuad(0, cap, 0);
+        evenQuad(0, -1 * cap, 0);
+        evenQuad(cap, 0, 0);
+        evenQuad(-1 * cap, 0, 0);
+        evenQuad(0, 0, cap);
+        evenQuad(0, 0, -1 * cap);
+
+        for(x = 0; x <= cap; x++){
+          for(z = 0; z <= cap; z++){
+            if(map[cap * (radius * radius) + x * radius + z] == 1 && !(x == 0 && z == 0)){
+              evenQuad(x, cap, z);
+            }
+          }
+        }
+
+        for(y = 0; y <= cap; y++){
+          for(z = 0; z <= cap; z++){
+            if(map[y * (radius * radius) + cap * radius + z] == 1 && !(z == 0 && y == 0)){
+              evenQuad(cap, y, z);
+            }
+          }
+        }
+        for(y = 0; y <= cap; y++){
+          for(x = 0; x <= cap; x++){
+            if(map[y * (radius * radius) + x * radius + cap] == 1 && !(x == 0 && y == 0)){
+              evenQuad(x, y, cap);
+            }
+          }
+        }
+        surface -= 24
+        volume = volume * 8
+
+      }
+      if(radius >= 3){
+        speech = "Total volume of the shape is : " + volume + ", " + surface + " required for the surface";
+      } else {
+        speech = "Radius is too small for calculations";
+      }
+      displayInformation(speech);
+    }
+
+    // ELLIPSE !!
+
+    function ellipse(length, width, height, parity){
+      surface = 0;
+      volume = 0;
+      // filling the map array with 0's
+      map = new Array((length + 1) * (width + 1) * (height + 1)).fill(0);
+      // Getting rid of all pre existing cubes from other functions
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
+      if(parity == "1"){
+        // The seed cube
+        cube(0, 0, 0);
+        for(y = 0; y <= height; y++){
+          for(x = 0; x <= width; x++){
+            for(z = 0; z <= length; z++){
+              // this is the heart of the sphere function, and applies the formula mentioned at the top of the sphere function.
+              if((x + 0.5)*(x + 0.5)/(width * width) + (y + 0.5)*(y + 0.5)/(height * height) + (z + 0.5)*(z + 0.5)/(length * length) <= 1){
+                volumeQuad(x,y,z);
+                map[(y * width * length) + (x * length) + z] = 1;
+              }
+            }
+          }
+        }
+        /*
+          Rendering every single cube is very resource intensive, so I only spawn cubes that are on the outside of the sphere. I do this by checking every single
+          cube to see if one of their sides has no neighbor. I only check in three directions because we are technically not working with a sphere, but a more
+          of a rounded wedge. This means some of the cubes are missed, but I will get them later.
+        */
+        for(y = height; y >= 0; y--){
+          for(x = width - 1; x >= 0; x--){
+            for(z = length - 1; z >= 0; z--){
+              if(map[(y + 1) * (width * length) + x * length + z] == 0 
+              || map[y * (width * length) + (x + 1) * length + z] == 0
+              || map[y * (width * length) + x * length + (z + 1)] == 0
+              || z == length - 1 || x == width - 1){
+                  if(map[y * (width * length) + x * length + z] == 1){
+                    if(x == 0 && z == 0){
+                      cube(x, y, z);
+                      cube(x, -1 * y, z);
+                      surface += 2;
+                    } else {
+                      map[y * (width * length) + x * length + z] = 2;
+                      quad(x, y, z);
+                    }
+                  }
+              }
+            }
+          }
+        }
+      } else if (parity == "0"){
+        // The seed cube
+        cube(0, 0, 0);
+        cube(0, 0, 0);
+        cube(-1, 0, 0);
+        cube(0, -1, 0);
+        cube(-1, -1, 0);
+        cube(0, 0, -1);
+        cube(-1, 0, -1);
+        cube(0, -1, -1);
+        cube(-1, -1, -1);
+        for(y = 0; y <= height; y++){
+          for(x = 0; x <= width; x++){
+            for(z = 0; z <= length; z++){
+              // this is the heart of the sphere function, and applies the formula mentioned at the top of the sphere function.
+              if((x + 0.5)*(x + 0.5)/(width * width) + (y + 0.5)*(y + 0.5)/(height * height) + (z + 0.5)*(z + 0.5)/(length * length) <= 1){
+                //volumeQuad(x,y,z);
+                map[(y * width * length) + (x * length) + z] = 1;
+                //quad(x, y, z);
+              }
+            }
+          }
+        }
+        /*
+          Rendering every single cube is very resource intensive, so I only spawn cubes that are on the outside of the sphere. I do this by checking every single
+          cube to see if one of their sides has no neighbor. I only check in three directions because we are technically not working with a sphere, but a more
+          of a rounded wedge. This means some of the cubes are missed, but I will get them later.
+        */
+        for(y = height; y >= 0; y--){
+          for(x = width - 1; x >= 0; x--){
+            for(z = length - 1; z >= 0; z--){
+              if(map[(y + 1) * (width * length) + x * length + z] == 0 
+              || map[y * (width * length) + (x + 1) * length + z] == 0
+              || map[y * (width * length) + x * length + (z + 1)] == 0
+              || z == length - 1 || x == width - 1){
+                  if(map[y * (width * length) + x * length + z] == 1){
+                    if(x == 0 && z == 0){
+                      evenQuad(x, y, z);
+                    } else {
+                      map[y * (width * length) + x * length + z] = 2;
+                      evenQuad(x, y, z);
+                    }
+                  }
+              }
+            }
+          }
+        }
+      }
+      if(true){
+        speech = "Total volume of the shape is : " + volume + ", " + surface + " required for the surface";
+      } else {
+        speech = "Radius is too small for calculations";
+      }
+      displayInformation(speech);
+    }
+
+
+    // Send data
+    document.getElementById('dataForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = document.getElementById('userInput').value;
+
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message })
+      });
+
+      const result = await res.json();
+      alert(result.status);
+
+      });
+  </script>
+</body>
+</html>
