@@ -100,7 +100,7 @@
           let minorRadius = e.target.querySelector("#minorRadius").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
           let angle = e.target.querySelector("#parity").value.trim();
-          toroid(minorRadius, minorRadius, majorRadius, majorRadius, parity, angle);
+          toroid(minorRadius, minorRadius, majorRadius, majorRadius, 90, 90, parity);
       }
       if(mode == "elliptical toroid"){
           e.preventDefault();
@@ -108,8 +108,9 @@
           let minorRadiusHeight = e.target.querySelector("#minorRadiusHeight").value.trim();
           let minorRadiusWidth = e.target.querySelector("#minorRadiusWidth").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          let angle = e.target.querySelector("#angle").value.trim();
-          toroid(minorRadiusWidth, minorRadiusHeight, majorRadius, majorRadius, parity, angle);
+          let majorAngle = e.target.querySelector("#majorAngle").value.trim();
+          let minorAngle = e.target.querySelector("#minorAngle").value.trim();
+          toroid(minorRadiusWidth, minorRadiusHeight, majorRadius, majorRadius, parity);
       }
       if(mode == "elliptical toroid with elliptical cross section"){
           e.preventDefault();
@@ -117,9 +118,10 @@
           let majorRadiusLength = e.target.querySelector("#majorRadiusLength").value.trim();
           let minorRadiusHeight = e.target.querySelector("#minorRadiusHeight").value.trim();
           let minorRadiusWidth = e.target.querySelector("#minorRadiusWidth").value.trim();
+          let majorAngle = e.target.querySelector("#majorAngle").value.trim();
+          let minorAngle = e.target.querySelector("#minorAngle").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          let angle = e.target.querySelector("#angle").value.trim();
-          toroid(minorRadiusHeight, minorRadiusWidth, majorRadiusWidth, majorRadiusLength, parity, angle);
+          toroid(minorRadiusHeight, minorRadiusWidth, majorRadiusWidth, majorRadiusLength, majorAngle, minorAngle, parity);
       }
     });
 
@@ -161,8 +163,6 @@
               <input type="text" id="minorRadius" name="minorRadius" required>
               <label for="parity">0 (Even) or 1 (Odd)?:</label>
               <input type="text" id="parity" name="parity" required>
-              <label for="angle">Angle:</label>
-              <input type="text" id="angle" name="angle" required>
               <button type="submit">Generate</button>
             </form>
             `;
@@ -176,10 +176,12 @@
               <input type="text" id="minorRadiusHeight" name="minorRadiusHeight" required>
               <label for="minorRadiusWidth">Minor Radius Width:</label>
               <input type="text" id="minorRadiusWidth" name="minorRadiusWidth" required>
+              <label for="minorRadiusWidth">Minor Radius Width:</label>
+              <input type="text" id="majorAngle" name="majorAngle" required>
+              <label for="majorAngle">Major Angle:</label>
+              <input type="text" id="majorAngle" name="majorAngle" required>
               <label for="parity">0 (Even) or 1 (Odd)?:</label>
               <input type="text" id="parity" name="parity" required>
-              <label for="angle">Angle:</label>
-              <input type="text" id="angle" name="angle" required>
               <button type="submit">Generate</button>
             </form>
             `;
@@ -194,11 +196,13 @@
               <label for="minorRadiusHeight">Minor Radius Height:</label>
               <input type="text" id="minorRadiusHeight" name="minorRadiusHeight" required>
               <label for="minorRadiusHeight">Minor Radius Width:</label>
-              <input type="text" id="minorRadiusHeight" name="minorRadiusHeight" required>
+              <input type="text" id="minorRadiusWidth" name="minorRadiusWidth" required>
+              <label for="minorRadiusWidth">Minor Radius Width:</label>
+              <input type="text" id="majorAngle" name="majorAngle" required>
+              <label for="majorAngle">Major Angle:</label>
+              <input type="text" id="majorAngle" name="majorAngle" required>
               <label for="parity">0 (Even) or 1 (Odd)?:</label>
               <input type="text" id="parity" name="parity" required>
-              <label for="angle">Angle:</label>
-              <input type="text" id="angle" name="angle" required>
               <button type="submit">Generate</button>
             </form>
             `;
@@ -490,11 +494,120 @@ function insideTorus(p, C, e1, e2, e3, R, a, b) {
       return u[0]*v[0] + u[1]*v[1] + u[2]*v[2];
     }
 
-function toroid(minorRadiusWidth, minorRadiusHeight, majorRadiusLength, majorRadiusWidth, parity, angle) {
-  if (parity == "1") {
-    
+function toroid(minorRadiusWidth, minorRadiusHeight, majorRadiusLength, majorRadiusWidth, majorAngle = 0, minorAngle = 0, parity) {
+  // parameters (semantic names)
+  cube(0,0,0);
+  const a_radial = Number(minorRadiusWidth);   // cross-section radius along radial (in-plane) axis
+  const b_vertical = Number(minorRadiusHeight); // cross-section radius along vertical (z) axis
+  const A = Number(majorRadiusLength);         // major ellipse semi-axis (x)
+  const B = Number(majorRadiusWidth);          // major ellipse semi-axis (y)
+  const rot = Number(majorAngle);              // global rotation (radians) about Z
+  const tilt = Number(minorAngle);             // cross-section rotation inside local plane (radians)
+
+  if (A <= 0 || B <= 0 || a_radial <= 0 || b_vertical <= 0) {
+    console.warn("All radii must be > 0");
+    return;
+  }
+
+  // bounding box (centered at origin). Increase slightly to be safe.
+  const bound = Math.ceil(Math.max(A, B) + Math.max(a_radial, b_vertical) + 1);
+  const size = 2 * bound + 1;
+
+  // initialize map (centered indexing)
+  const map = new Uint8Array(size * size * size); // 0/1 occupancy
+  function idx(x, y, z) {
+    // x,y,z are integer coords in [-bound..bound]
+    return ((y + bound) * size + (x + bound)) * size + (z + bound);
+  }
+
+  // clear previous meshes if your engine uses scene.meshes
+  if (typeof scene !== "undefined" && scene.meshes) {
+    scene.meshes.slice().forEach(m => m.dispose && m.dispose());
+  }
+
+  // helper rotate about Z
+  function rotateZ(x, y, a) {
+    const ca = Math.cos(a), sa = Math.sin(a);
+    return [ca * x - sa * y, sa * x + ca * y];
+  }
+
+  // Find parameter u on ellipse C(u) ~= closest point to (px,py) using Newton's method
+  function nearestUonEllipse(px, py) {
+    // good initial guess: angle of (px/A, py/B)
+    let u = Math.atan2(py / B, px / A);
+    for (let i = 0; i < 12; i++) {
+      const cu = Math.cos(u), su = Math.sin(u);
+      // C(u)
+      const Cx = A * cu, Cy = B * su;
+      // C'(u)
+      const Cpx = -A * su, Cpy = B * cu;
+      // C''(u)
+      const Cppx = -A * cu, Cppy = -B * su;
+
+      const Fx = Cx - px, Fy = Cy - py;           // C - P_xy
+      const f = Fx * Cpx + Fy * Cpy;             // f(u) = <C - P, C'>
+      const fp = Cpx * Cpx + Cpy * Cpy + Fx * Cppx + Fy * Cppy; // f'(u)
+      if (Math.abs(fp) < 1e-12) break;
+      const du = f / fp;
+      u -= du;
+      if (Math.abs(du) < 1e-8) break;
+    }
+    // normalize u into [-PI, PI] or [0,2PI] not required but nice
+    return u;
+  }
+
+  let volume = 0;
+  if (parity === "1") {
+    for (let x = -bound; x <= bound; x++) {
+      for (let y = -bound; y <= bound; y++) {
+        // compute nearest u to (x,y) on major ellipse
+        const u = nearestUonEllipse(x, y);
+
+        // ellipse point C(u)
+        const cu = Math.cos(u), su = Math.sin(u);
+        let Cx = A * cu, Cy = B * su;
+        // rotate the center point by majorAngle
+        [Cx, Cy] = rotateZ(Cx, Cy, rot);
+
+        // radial normal in ellipse param (before rotation)
+        // gradient of x^2/A^2 + y^2/B^2 = 1 gives normal proportional to (cos u / A, sin u / B)
+        let Nx = (cu / A), Ny = (su / B);
+        const Nlen = Math.hypot(Nx, Ny);
+        if (Nlen === 0) continue;
+        Nx /= Nlen; Ny /= Nlen;
+        // rotate normal by the global rotation
+        [Nx, Ny] = rotateZ(Nx, Ny, rot);
+
+        // construct the two orthonormal axes for the cross-section plane:
+        // axis1 = rotated radial normal (Nx,Ny,0)
+        // axis2 = Z axis (0,0,1)
+        // rotate these inside their plane by 'tilt' to get the ellipse axes orientation
+        const ca = Math.cos(tilt), sa = Math.sin(tilt);
+        // axis u1 = ca * N + sa * Z
+        const u1x = ca * Nx, u1y = ca * Ny, u1z = sa;
+        // axis u2 = -sa * N + ca * Z   (orthogonal)
+        const u2x = -sa * Nx, u2y = -sa * Ny, u2z = ca;
+
+        for (let z = -bound; z <= bound; z++) {
+          // vector from centerline to point
+          const Vx = x - Cx, Vy = y - Cy, Vz = z - 0;
+
+          // coordinates in local cross-section axes
+          const s = Vx * u1x + Vy * u1y + Vz * u1z;
+          const t = Vx * u2x + Vy * u2y + Vz * u2z;
+
+          const val = (s / a_radial) * (s / a_radial) + (t / b_vertical) * (t / b_vertical);
+          if (val <= 1.0) {
+            map[idx(x, y, z)] = 1;
+            volume++;
+            // place voxel / cube at integer coords (x,y,z)
+            if (typeof cube === "function") cube(x, y, z);
+          }
+        }
       }
     }
+  }
+}
 
     // Send data
     document.getElementById('dataForm').addEventListener('submit', async (e) => {
