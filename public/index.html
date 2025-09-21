@@ -78,7 +78,6 @@
     let surface = 0;
     let speech = "";
     let mode = "none";
-
     specifications.addEventListener("submit", function(e) {
       if(mode == "sphere"){
           e.preventDefault();
@@ -99,8 +98,7 @@
           let majorRadius = e.target.querySelector("#majorRadius").value.trim();
           let minorRadius = e.target.querySelector("#minorRadius").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          let angle = e.target.querySelector("#parity").value.trim();
-          toroid(minorRadius, minorRadius, majorRadius, majorRadius, 90, 90, parity);
+          toroid(1, 1, 1, majorRadius, minorRadius, parity);
       }
       if(mode == "elliptical toroid"){
           e.preventDefault();
@@ -108,9 +106,7 @@
           let minorRadiusHeight = e.target.querySelector("#minorRadiusHeight").value.trim();
           let minorRadiusWidth = e.target.querySelector("#minorRadiusWidth").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          let majorAngle = e.target.querySelector("#majorAngle").value.trim();
-          let minorAngle = e.target.querySelector("#minorAngle").value.trim();
-          toroid(minorRadiusWidth, minorRadiusHeight, majorRadius, majorRadius, parity);
+          //toroid(minorRadiusWidth, minorRadiusHeight, , parity);
       }
       if(mode == "elliptical toroid with elliptical cross section"){
           e.preventDefault();
@@ -118,10 +114,8 @@
           let majorRadiusLength = e.target.querySelector("#majorRadiusLength").value.trim();
           let minorRadiusHeight = e.target.querySelector("#minorRadiusHeight").value.trim();
           let minorRadiusWidth = e.target.querySelector("#minorRadiusWidth").value.trim();
-          let majorAngle = e.target.querySelector("#majorAngle").value.trim();
-          let minorAngle = e.target.querySelector("#minorAngle").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          toroid(minorRadiusHeight, minorRadiusWidth, majorRadiusWidth, majorRadiusLength, majorAngle, minorAngle, parity);
+          //toroid(minorRadiusHeight, minorRadiusWidth, majorRadiusWidth, majorRadiusLength, parity);
       }
     });
 
@@ -215,7 +209,10 @@
 
     // Babylon startup stuff
     const canvas = document.getElementById("render-canvas");
-    const engine = new BABYLON.Engine(canvas);
+    const engine = new BABYLON.Engine(canvas, true, {
+      preserveDrawingBuffer: true,
+      stencil: true
+    });
     const scene = new BABYLON.Scene(engine);
     scene.clearColor = new BABYLON.Color3(0.9, 0.9, 0.9);
     function renderLoop() {
@@ -470,144 +467,92 @@
     }
 
     /*
-
-// point-in-torus check
-// p  = [x,y,z] voxel center
-// C  = [cx,cy,cz] torus center
-// e1,e2,e3 = orthonormal basis vectors of torus
-// R  = major radius
-// a,b = ellipse semi-axes (radial, vertical)
-function insideTorus(p, C, e1, e2, e3, R, a, b) {
-  const q = [p[0]-C[0], p[1]-C[1], p[2]-C[2]];
-
-  const u = dot(q, e1);
-  const v = dot(q, e2);
-  const w = dot(q, e3);
-
-  const rho = Math.hypot(u, v);
-
-  return ((rho - R)**2) / (a*a) + (w*w) / (b*b) <= 1.0;
-}
+      The toroid function works similarly to the ellipse() function, but the equation is :
+      (Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R)*(Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R) + (z/c)*(z/c) <= r*r
     */
 
-    function dot(u, v) {
-      return u[0]*v[0] + u[1]*v[1] + u[2]*v[2];
-    }
+function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, parity) {
+      surface = 0;
+      volume = 0;
+      let a = scaleWidth;
+      let b = scaleLength;
+      let c = scaleHeight;
+      let R = majorRadius;
+      let r = minorRadius;
 
-function toroid(minorRadiusWidth, minorRadiusHeight, majorRadiusLength, majorRadiusWidth, majorAngle = 0, minorAngle = 0, parity) {
-  // parameters (semantic names)
-  cube(0,0,0);
-  const a_radial = Number(minorRadiusWidth);   // cross-section radius along radial (in-plane) axis
-  const b_vertical = Number(minorRadiusHeight); // cross-section radius along vertical (z) axis
-  const A = Number(majorRadiusLength);         // major ellipse semi-axis (x)
-  const B = Number(majorRadiusWidth);          // major ellipse semi-axis (y)
-  const rot = Number(majorAngle);              // global rotation (radians) about Z
-  const tilt = Number(minorAngle);             // cross-section rotation inside local plane (radians)
+      let width = (parseInt(majorRadius) + parseInt(minorRadius)) * parseInt(scaleWidth);
+      let length = parseInt(minorRadius) * parseInt(scaleHeight);
+      let height = (parseInt(majorRadius) + parseInt(minorRadius)) * parseInt(scaleHeight);
+      // filling the map array with 0's
+      map = new Array((majorRadius * scaleWidth + 1) * (majorRadius * scaleLength + 1) * (minorRadius * scaleHeight + 1)).fill(0);
 
-  if (A <= 0 || B <= 0 || a_radial <= 0 || b_vertical <= 0) {
-    console.warn("All radii must be > 0");
-    return;
-  }
+      //I made my own psudo .fill(0) function because for whatever reason, 
+      // .fill(0) does not actually fill every voxel with a 0. I'm not sure why, but I made this to fix it.
 
-  // bounding box (centered at origin). Increase slightly to be safe.
-  const bound = Math.ceil(Math.max(A, B) + Math.max(a_radial, b_vertical) + 1);
-  const size = 2 * bound + 1;
+        for(y = height; y >= 0; y--){
+          for(x = width - 1; x >= 0; x--){
+            for(z = length - 1; z >= 0; z--){
+              map[(y * width * length) + (x * length) + z] = 0;
+            }
+          }
+        }
 
-  // initialize map (centered indexing)
-  const map = new Uint8Array(size * size * size); // 0/1 occupancy
-  function idx(x, y, z) {
-    // x,y,z are integer coords in [-bound..bound]
-    return ((y + bound) * size + (x + bound)) * size + (z + bound);
-  }
+      // Getting rid of all pre existing cubes from other functions
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
+      if(parity == "1"){
+        // The seed cube
+        cube(0,0,0);
+        for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
+          for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
+            for(z = 0; z <= (minorRadius) * scaleHeight; z++){
+              //This is the kernel of the toroid function. This is the equation that determines what voxels should be considered filled.
+              if((Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R)*(Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R) + (z/c)*(z/c) <= r*r){
+                map[(y * width * length) + (x * length) + z] = 1;
+                //quad(x,y,z);
+              }
+            }
+          }
+        }
+        volume -= 1;
+        /*
+          Rendering every single cube is very resource intensive, so I only spawn cubes that are on the outside of the sphere. I do this by checking every single
+          cube to see if one of their sides has no neighbor. I only check in three directions because we are technically not working with a sphere, but a more
+          of a rounded wedge. This means some of the cubes are missed, but I will get them later.
+        */
 
-  // clear previous meshes if your engine uses scene.meshes
-  if (typeof scene !== "undefined" && scene.meshes) {
-    scene.meshes.slice().forEach(m => m.dispose && m.dispose());
-  }
+        map[height * (width * length) + 0 * length + 0] = 0
 
-  // helper rotate about Z
-  function rotateZ(x, y, a) {
-    const ca = Math.cos(a), sa = Math.sin(a);
-    return [ca * x - sa * y, sa * x + ca * y];
-  }
-
-  // Find parameter u on ellipse C(u) ~= closest point to (px,py) using Newton's method
-  function nearestUonEllipse(px, py) {
-    // good initial guess: angle of (px/A, py/B)
-    let u = Math.atan2(py / B, px / A);
-    for (let i = 0; i < 12; i++) {
-      const cu = Math.cos(u), su = Math.sin(u);
-      // C(u)
-      const Cx = A * cu, Cy = B * su;
-      // C'(u)
-      const Cpx = -A * su, Cpy = B * cu;
-      // C''(u)
-      const Cppx = -A * cu, Cppy = -B * su;
-
-      const Fx = Cx - px, Fy = Cy - py;           // C - P_xy
-      const f = Fx * Cpx + Fy * Cpy;             // f(u) = <C - P, C'>
-      const fp = Cpx * Cpx + Cpy * Cpy + Fx * Cppx + Fy * Cppy; // f'(u)
-      if (Math.abs(fp) < 1e-12) break;
-      const du = f / fp;
-      u -= du;
-      if (Math.abs(du) < 1e-8) break;
-    }
-    // normalize u into [-PI, PI] or [0,2PI] not required but nice
-    return u;
-  }
-
-  let volume = 0;
-  if (parity === "1") {
-    for (let x = -bound; x <= bound; x++) {
-      for (let y = -bound; y <= bound; y++) {
-        // compute nearest u to (x,y) on major ellipse
-        const u = nearestUonEllipse(x, y);
-
-        // ellipse point C(u)
-        const cu = Math.cos(u), su = Math.sin(u);
-        let Cx = A * cu, Cy = B * su;
-        // rotate the center point by majorAngle
-        [Cx, Cy] = rotateZ(Cx, Cy, rot);
-
-        // radial normal in ellipse param (before rotation)
-        // gradient of x^2/A^2 + y^2/B^2 = 1 gives normal proportional to (cos u / A, sin u / B)
-        let Nx = (cu / A), Ny = (su / B);
-        const Nlen = Math.hypot(Nx, Ny);
-        if (Nlen === 0) continue;
-        Nx /= Nlen; Ny /= Nlen;
-        // rotate normal by the global rotation
-        [Nx, Ny] = rotateZ(Nx, Ny, rot);
-
-        // construct the two orthonormal axes for the cross-section plane:
-        // axis1 = rotated radial normal (Nx,Ny,0)
-        // axis2 = Z axis (0,0,1)
-        // rotate these inside their plane by 'tilt' to get the ellipse axes orientation
-        const ca = Math.cos(tilt), sa = Math.sin(tilt);
-        // axis u1 = ca * N + sa * Z
-        const u1x = ca * Nx, u1y = ca * Ny, u1z = sa;
-        // axis u2 = -sa * N + ca * Z   (orthogonal)
-        const u2x = -sa * Nx, u2y = -sa * Ny, u2z = ca;
-
-        for (let z = -bound; z <= bound; z++) {
-          // vector from centerline to point
-          const Vx = x - Cx, Vy = y - Cy, Vz = z - 0;
-
-          // coordinates in local cross-section axes
-          const s = Vx * u1x + Vy * u1y + Vz * u1z;
-          const t = Vx * u2x + Vy * u2y + Vz * u2z;
-
-          const val = (s / a_radial) * (s / a_radial) + (t / b_vertical) * (t / b_vertical);
-          if (val <= 1.0) {
-            map[idx(x, y, z)] = 1;
-            volume++;
-            // place voxel / cube at integer coords (x,y,z)
-            if (typeof cube === "function") cube(x, y, z);
+        for(y = height; y >= 0; y--){
+          for(x = width - 1; x >= 0; x--){
+            for(z = length - 1; z >= 0; z--){
+              if(map[(y + 1) * (width * length) + x * length + z] == 0 
+              || map[y * (width * length) + (x + 1) * length + z] == 0
+              || map[y * (width * length) + x * length + (z + 1)] == 0
+              || z == length - 1 || x == width - 1
+              || (map[y * (width * length) + (x - 1) * length + z] == 0 && x != 0)
+              || map[(y - 1) * (width * length) + x * length + z] == 0){
+                  if(map[y * (width * length) + x * length + z] == 1 && x != width){
+                    if(x == 0 && z == 0){
+                      cube(x, y, z);
+                      cube(x, -1 * y, z);
+                      surface += 2;
+                    } else {
+                      map[y * (width * length) + x * length + z] = 2;
+                      quad(x, y, z);
+                    }
+                  }
+              }
+            }
           }
         }
       }
+      if(true){
+        speech = "Total volume of the shape is : " + volume + ", " + surface + " required for the surface";
+      } else {
+        speech = "Radius is too small for calculations";
+      }
+      displayInformation(speech);
     }
-  }
-}
 
     // Send data
     document.getElementById('dataForm').addEventListener('submit', async (e) => {
