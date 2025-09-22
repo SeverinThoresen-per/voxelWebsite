@@ -33,12 +33,16 @@
     .canvas{
         text-align: center;
     }
+    .header{
+      text-align: center;
+    }
   </style>
 </head>
 <body>
   <h1 class="title">Optimal Cube Shapes</h1>
 
   <div class="field">
+    <h2 class="header">Spheres, Ovoids, and Toroids</h2>
     <form id="parameters">
         <select name="shape" id="shape" type="shape">
         <option value="none">List of common shapes</option>
@@ -50,6 +54,20 @@
         </select>
     </form>
     <div id="specifications"></div>
+  </div>
+  <div class = "field">
+    <h2 class = "header">Lathe</h2>
+    <h3 class = "header">Define your own shape using an interval of a function, the line created by this interval is spun 360 degrees to form a 
+      radially symetrical shape Single variable functions only, use the form y = F(x). Ex : y = (x + 8)^2.
+    </h3>
+    <form>
+        <select name="lathe" id="lathe" type="lathe">
+        <option value="off">Off</option>
+        <option value="on">On</option>
+        </select>
+    </form>
+    <div id = "latheSpecifications">
+    </div>
   </div>
 
   <div class="render-canvas">
@@ -73,11 +91,38 @@
     ctx.fillRect(0, 0, 10, 10)
 
     let shape = document.getElementById("shape");
+    let lathe = document.getElementById("lathe");
     let specifications = document.getElementById("specifications");
+    let latheSpecifications = document.getElementById("latheSpecifications");
     let volume = 0;
     let surface = 0;
     let speech = "";
     let mode = "none";
+
+    lathe.addEventListener("change", function(e){
+      if(this.value == "on"){
+            latheSpecifications.innerHTML = `
+            <form id="latheParameters" novalidate>
+            <label for="formula">Formula: </label>
+            <input type="text" id="formula" name="formula" required>
+
+            <label for="index1">Index 1: </label>
+            <input type="text" id="index1" name="index1" required>
+
+            <label for="index2">Index 2: </label>
+            <input type="text" id="index2" name="index2" required>
+
+            <label for="scale">Scale: </label>
+            <input type="text" id="scale" name="scale" required>
+
+            <button type="submit">Generate</button>
+          </form>
+      `
+      } else {
+        latheSpecifications.innerHTML = "";
+      }
+    })
+
     specifications.addEventListener("submit", function(e) {
       if(mode == "sphere"){
           e.preventDefault();
@@ -103,19 +148,21 @@
       if(mode == "elliptical toroid"){
           e.preventDefault();
           let majorRadius = e.target.querySelector("#majorRadius").value.trim();
-          let minorRadiusHeight = e.target.querySelector("#minorRadiusHeight").value.trim();
-          let minorRadiusWidth = e.target.querySelector("#minorRadiusWidth").value.trim();
+          let minorRadius = e.target.querySelector("#minorRadius").value.trim();
+          let widthScale = e.target.querySelector("#widthScale").value.trim();
+          let lengthScale = e.target.querySelector("#lengthScale").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          //toroid(minorRadiusWidth, minorRadiusHeight, , parity);
+          toroid(widthScale, lengthScale, 1,majorRadius, minorRadius, parity);
       }
       if(mode == "elliptical toroid with elliptical cross section"){
           e.preventDefault();
-          let majorRadiusWidth = e.target.querySelector("#majorRadiusWidth").value.trim();
-          let majorRadiusLength = e.target.querySelector("#majorRadiusLength").value.trim();
-          let minorRadiusHeight = e.target.querySelector("#minorRadiusHeight").value.trim();
-          let minorRadiusWidth = e.target.querySelector("#minorRadiusWidth").value.trim();
+          let majorRadius = e.target.querySelector("#majorRadius").value.trim();
+          let minorRadius = e.target.querySelector("#minorRadius").value.trim();
+          let widthScale = e.target.querySelector("#widthScale").value.trim();
+          let lengthScale = e.target.querySelector("#lengthScale").value.trim();
+          let heightScale = e.target.querySelector("#heightScale").value.trim();
           let parity = e.target.querySelector("#parity").value.trim();
-          //toroid(minorRadiusHeight, minorRadiusWidth, majorRadiusWidth, majorRadiusLength, parity);
+          toroid(widthScale, lengthScale, heightScale, majorRadius, minorRadius, parity);
       }
     });
 
@@ -126,8 +173,10 @@
         specifications.innerHTML = `
           <form id="parameters" novalidate>
             <label for="radius">Radius:</label>
+
             <input type="text" id="radius" name="radius" required>
             <label for="parity">0 (Even) or 1 (Odd)?:</label>
+
             <input type="text" id="parity" name="parity" required>
             <button type="submit">Generate</button>
           </form>
@@ -138,12 +187,16 @@
             <form id="parameters">
               <label for="width">width: </label>
               <input type="text" id="width" name="width" required>
+
               <label for="length">length:</label>
               <input type="text" id="length" name="length" required>
+
               <label for="height">height:</label>
               <input type="text" id="height" name="height" required>
+
               <label for="parity">0 (Even) or 1 (Odd)?: </label>
               <input type="text" id="parity" name="parity" required>
+
               <button type="submit">Generate</button>
             </form>
             `;
@@ -153,8 +206,10 @@
             <form id="parameters">
               <label for="majorRadius">Major Radius:</label>
               <input type="text" id="majorRadius" name="majorRadius" required>
+
               <label for="minorRadius">Minor Radius:</label>
               <input type="text" id="minorRadius" name="minorRadius" required>
+
               <label for="parity">0 (Even) or 1 (Odd)?:</label>
               <input type="text" id="parity" name="parity" required>
               <button type="submit">Generate</button>
@@ -166,14 +221,16 @@
             <form id="parameters">
               <label for="majorRadius">Major Radius:</label>
               <input type="text" id="majorRadius" name="majorRadius" required>
-              <label for="minorRadiusHeight">Minor Radius Height:</label>
-              <input type="text" id="minorRadiusHeight" name="minorRadiusHeight" required>
-              <label for="minorRadiusWidth">Minor Radius Width:</label>
-              <input type="text" id="minorRadiusWidth" name="minorRadiusWidth" required>
-              <label for="minorRadiusWidth">Minor Radius Width:</label>
-              <input type="text" id="majorAngle" name="majorAngle" required>
-              <label for="majorAngle">Major Angle:</label>
-              <input type="text" id="majorAngle" name="majorAngle" required>
+
+              <label for="widthScale">Width Scale:</label>
+              <input type="text" id="widthScale" name="widthScale" required>
+
+              <label for="lengthScale">Length Scale:</label>
+              <input type="text" id="lengthScale" name="lengthScale" required>
+
+              <label for="minorRadius">Minor Radius:</label>
+              <input type="text" id="minorRadius" name="minorRadius" required>
+
               <label for="parity">0 (Even) or 1 (Odd)?:</label>
               <input type="text" id="parity" name="parity" required>
               <button type="submit">Generate</button>
@@ -183,18 +240,21 @@
           mode = "elliptical toroid with elliptical cross section";
             specifications.innerHTML = `
             <form id="parameters">
-              <label for="majorRadiusWidth">Major Radius Width:</label>
-              <input type="text" id="majorRadiusWidth" name="majorRadiusWidth" required>
-              <label for="majorRadiusLength">Major Radius Length:</label>
-              <input type="text" id="majorRadiusLength" name="majorRadiusLength" required>
-              <label for="minorRadiusHeight">Minor Radius Height:</label>
-              <input type="text" id="minorRadiusHeight" name="minorRadiusHeight" required>
-              <label for="minorRadiusHeight">Minor Radius Width:</label>
-              <input type="text" id="minorRadiusWidth" name="minorRadiusWidth" required>
-              <label for="minorRadiusWidth">Minor Radius Width:</label>
-              <input type="text" id="majorAngle" name="majorAngle" required>
-              <label for="majorAngle">Major Angle:</label>
-              <input type="text" id="majorAngle" name="majorAngle" required>
+              <label for="majorRadius">Major Radius:</label>
+              <input type="text" id="majorRadius" name="majorRadius" required>
+
+              <label for="widthScale">Width Scale:</label>
+              <input type="text" id="widthScale" name="widthScale" required>
+
+              <label for="lengthScale">Length Scale:</label>
+              <input type="text" id="lengthScale" name="lengthScale" required>
+
+              <label for="heightScale">Height Scale:</label>
+              <input type="text" id="heightScale" name="heightScale" required>
+
+              <label for="minorRadius">Minor Radius:</label>
+              <input type="text" id="minorRadius" name="minorRadius" required>
+
               <label for="parity">0 (Even) or 1 (Odd)?:</label>
               <input type="text" id="parity" name="parity" required>
               <button type="submit">Generate</button>
@@ -480,11 +540,11 @@ function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, 
       let R = majorRadius;
       let r = minorRadius;
 
-      let width = (parseInt(majorRadius) + parseInt(minorRadius)) * parseInt(scaleWidth);
+      let width = (parseInt(majorRadius) + parseInt(minorRadius)) * Math.ceil(scaleWidth);
       let length = parseInt(minorRadius) * parseInt(scaleHeight);
-      let height = (parseInt(majorRadius) + parseInt(minorRadius)) * parseInt(scaleHeight);
+      let height = (parseInt(majorRadius) + parseInt(minorRadius)) * Math.ceil(scaleLength);
       // filling the map array with 0's
-      map = new Array((majorRadius * scaleWidth + 1) * (majorRadius * scaleLength + 1) * (minorRadius * scaleHeight + 1)).fill(0);
+      map = new Array((majorRadius * Math.ceil(scaleWidth) + 1) * (majorRadius * Math.ceil(scaleLength) + 1) * (minorRadius * Math.ceil(scaleHeight) + 1)).fill(0);
 
       //I made my own psudo .fill(0) function because for whatever reason, 
       // .fill(0) does not actually fill every voxel with a 0. I'm not sure why, but I made this to fix it.
@@ -499,16 +559,34 @@ function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, 
 
       // Getting rid of all pre existing cubes from other functions
       scene.meshes.slice().forEach(mesh => mesh.dispose());
-      if(parity == "1"){
-        // The seed cube
-        cube(0,0,0);
+      if(parity == "1"){ 
         for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
           for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
             for(z = 0; z <= (minorRadius) * scaleHeight; z++){
               //This is the kernel of the toroid function. This is the equation that determines what voxels should be considered filled.
               if((Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R)*(Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R) + (z/c)*(z/c) <= r*r){
                 map[(y * width * length) + (x * length) + z] = 1;
-                //quad(x,y,z);
+                if(y == 0 && x == 0){
+                  volume += 2;
+                } else if (x == 0 && z == 0){
+                  volume += 2;
+                } else if (z == 0 && y == 0){
+                  volume += 2;
+                } else if(y == 0 || z == 0|| x == 0){
+                  volume += 4;
+                } else {
+                  volume += 8;
+                }
+              }
+            }
+          }
+        }
+        for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
+          for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
+            for(z = 0; z <= (minorRadius) * scaleHeight; z++){
+              //This is the kernel of the toroid function. This is the equation that determines what voxels should be considered filled.
+              if(x*x + y*y + z*z < Math.pow(majorRadius - minorRadius,2)){
+                map[(y * width * length) + (x * length) + z] = 0;
               }
             }
           }
@@ -539,6 +617,67 @@ function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, 
                     } else {
                       map[y * (width * length) + x * length + z] = 2;
                       quad(x, y, z);
+                    }
+                  }
+              }
+            }
+          }
+        }
+      } else if (parity == "0"){
+        for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
+          for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
+            for(z = 0; z <= (minorRadius) * scaleHeight; z++){
+              //This is the kernel of the toroid function. This is the equation that determines what voxels should be considered filled.
+              if((Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R)*(Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R) + (z/c)*(z/c) <= r*r){
+                map[(y * width * length) + (x * length) + z] = 1;
+                volume += 8;
+              }
+            }
+          }
+        }
+        for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
+          for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
+            for(z = 0; z <= (minorRadius) * scaleHeight; z++){
+              //This is the kernel of the toroid function. This is the equation that determines what voxels should be considered filled.
+              if(x*x + y*y + z*z < Math.pow(majorRadius - minorRadius,2)){
+                map[(y * width * length) + (x * length) + z] = 0;
+              }
+            }
+          }
+        }
+        volume -= 1;
+        /*
+          Rendering every single cube is very resource intensive, so I only spawn cubes that are on the outside of the sphere. I do this by checking every single
+          cube to see if one of their sides has no neighbor. I only check in three directions because we are technically not working with a sphere, but a more
+          of a rounded wedge. This means some of the cubes are missed, but I will get them later.
+        */
+
+        map[height * (width * length) + 0 * length + 0] = 0
+
+        for(y = height; y >= 0; y--){
+          for(x = width - 1; x >= 0; x--){
+            for(z = length - 1; z >= 0; z--){
+              if(map[(y + 1) * (width * length) + x * length + z] == 0 
+              || map[y * (width * length) + (x + 1) * length + z] == 0
+              || map[y * (width * length) + x * length + (z + 1)] == 0
+              || z == length - 1 || x == width - 1
+              || (map[y * (width * length) + (x - 1) * length + z] == 0 && x != 0)
+              || map[(y - 1) * (width * length) + x * length + z] == 0){
+                  if(map[y * (width * length) + x * length + z] == 1 && x != width){
+                    if(x == 0 && z == 0){
+                      cube(x, y, z);
+                      cube(x, -1 * y - 1, z);
+                      cube(x - 1, y, z);
+                      cube(x - 1, -1 * y - 1, z);
+
+                      cube(x, y, z - 1);
+                      cube(x, -1 * y - 1, z - 1);
+                      cube(x - 1, y, z - 1);
+                      cube(x - 1, -1 * y - 1, z - 1);
+                      surface += 8;
+                    } else {
+                      map[y * (width * length) + x * length + z] = 2;
+                      evenQuad(x, y, z);
                     }
                   }
               }
