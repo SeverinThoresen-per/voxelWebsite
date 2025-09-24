@@ -58,7 +58,7 @@
   <div class = "field">
     <h2 class = "header">Lathe</h2>
     <h3 class = "header">Define your own shape using an interval of a function, the line created by this interval is spun 360 degrees to form a 
-      radially symetrical shape Single variable functions only, use the form y = F(x). Ex : y = (x + 8)^2.
+      radially symetrical shape Single variable functions only with x as the variable, (x + 8)^2.
     </h3>
     <form>
         <select name="lathe" id="lathe" type="lathe">
@@ -121,6 +121,15 @@
       } else {
         latheSpecifications.innerHTML = "";
       }
+    })
+
+    latheSpecifications.addEventListener("submit", function(e){
+      e.preventDefault();
+      let equation = e.target.querySelector("#formula").value.trim();
+      let index1 = e.target.querySelector("#index1").value.trim();
+      let index2 = e.target.querySelector("#index2").value.trim();
+      let scale = e.target.querySelector("#scale").value.trim();
+      latheFunc(equation, index1, index2, scale);
     })
 
     specifications.addEventListener("submit", function(e) {
@@ -531,7 +540,7 @@
       (Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R)*(Math.sqrt((x/a)*(x/a) + (y/b)*(y/b)) - R) + (z/c)*(z/c) <= r*r
     */
 
-function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, parity) {
+  function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, parity) {
       surface = 0;
       volume = 0;
       let a = scaleWidth;
@@ -693,6 +702,23 @@ function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, 
       displayInformation(speech);
     }
 
+    /*
+    
+    */
+
+    function latheFunc(equation, index1, index2, scale){
+      equation = equation.replace(/\^/g, "**");
+      F = new Function("x", `return ${equation};`)
+        for(y = 0; y <= height; y++){
+          for(x = 0; x <= width; x++){
+            for(z = 0; z <= length; z++){
+              if((x + 0.5)*(x + 0.5)/(width * width) + (y + 0.5)*(y + 0.5)/(height * height) + (z + 0.5)*(z + 0.5)/(length * length) <= 1){
+                map[(y * width * length) + (x * length) + z] = 1;
+              }
+            }
+          }
+        }
+    }
     // Send data
     document.getElementById('dataForm').addEventListener('submit', async (e) => {
       e.preventDefault();
