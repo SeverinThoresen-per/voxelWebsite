@@ -115,6 +115,9 @@
             <label for="scale">Scale: </label>
             <input type="text" id="scale" name="scale" required>
 
+            <label for="parity">0(Even) or 1(Odd)?: </label>
+            <input type="text" id="parity" name="parity" required>
+
             <button type="submit">Generate</button>
           </form>
       `
@@ -129,7 +132,8 @@
       let index1 = e.target.querySelector("#index1").value.trim();
       let index2 = e.target.querySelector("#index2").value.trim();
       let scale = e.target.querySelector("#scale").value.trim();
-      latheFunc(equation, index1, index2, scale);
+      let parity = e.target.querySelector("#parity").value.trim();
+      latheFunc(equation, index1, index2, scale, parity);
     })
 
     specifications.addEventListener("submit", function(e) {
@@ -414,6 +418,26 @@
         surface += 8
 
     }
+    
+    function latheQuad(x, y, z){
+        if(x == 0){
+          cube(x, y, z);
+          cube(x, y, -1 * z);
+          surface += 2
+        } else if (z == 0){
+          cube(x, y, z);
+          cube(-1 * x, y, z);
+          surface += 2
+        } else {
+          cube(x, y, z);
+          cube(-1 * x, y, z);
+          cube(x, y, -1 * z);
+          cube(-1 * x, y, -1 * z);
+          surface += 4
+
+        }
+    }
+
     /*
       In a nutshell, the ellipse function works by checking every single corner of each cube to see if it is less than the radius using the equation
       x^2/w^2 + y^2/h^2 + z^2/l^2 <= 1. Each successful cube placement is inserted into the map[] array for later optimization.
@@ -644,10 +668,11 @@
             }
           }
         }
+        // There were issues with generating the middle of the toroid. There were small "growths" on the edges and in the center of the hole
+        // This function basically clears the entire center to make sure those growths do not occur.
         for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
           for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
             for(z = 0; z <= (minorRadius) * scaleHeight; z++){
-              //This is the kernel of the toroid function. This is the equation that determines what voxels should be considered filled.
               if(x*x + y*y + z*z < Math.pow(majorRadius - minorRadius,2)){
                 map[(y * width * length) + (x * length) + z] = 0;
               }
@@ -657,8 +682,7 @@
         volume -= 1;
         /*
           Rendering every single cube is very resource intensive, so I only spawn cubes that are on the outside of the sphere. I do this by checking every single
-          cube to see if one of their sides has no neighbor. I only check in three directions because we are technically not working with a sphere, but a more
-          of a rounded wedge. This means some of the cubes are missed, but I will get them later.
+          cube to see if one of their sides has no neighbor.
         */
 
         map[height * (width * length) + 0 * length + 0] = 0
@@ -703,21 +727,64 @@
     }
 
     /*
-    
+
     */
 
-    function latheFunc(equation, index1, index2, scale){
+    function latheFunc(equation, index1, index2, scale, parity){
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
       equation = equation.replace(/\^/g, "**");
-      F = new Function("x", `return ${equation};`)
-        for(y = 0; y <= height; y++){
-          for(x = 0; x <= width; x++){
-            for(z = 0; z <= length; z++){
-              if((x + 0.5)*(x + 0.5)/(width * width) + (y + 0.5)*(y + 0.5)/(height * height) + (z + 0.5)*(z + 0.5)/(length * length) <= 1){
-                map[(y * width * length) + (x * length) + z] = 1;
+      F = new Function("x", `return ${equation};`);
+      let secondIndex = 0;
+      let firstIndex = 0;
+      if(index1 > index2){
+        firstIndex = index1;
+        secondIndex = index2;
+      } else if (index2 >= index1){
+        firstIndex = index2;
+        secondIndex = index1;
+      }
+      let radius = 0;
+        for(y = secondIndex; y <= firstIndex; y++){
+          if(F(y) > radius){
+            radius = F(y);
+          }
+        }
+      if(parity == "1"){
+        for(y = 0; y <= secondIndex - firstIndex; y++){
+          for(x = 0; x <= F(firstIndex + y); x++){
+            for(z = 0; z <= F(firstIndex + y); z++){
+              if((x + 0.5)*(x + 0.5) + (z + 0.5)*(z + 0.5) <= F(firstIndex + y) * F(firstIndex + y)){
+                map[(y * radius * radius) + (x * radius) + z] = 1;
+                latheQuad(x,y,z);
               }
             }
           }
         }
+
+        for(y = 0; y <= secondIndex - firstIndex; y++){
+          for(x = radius - 1; x >= 0; x--){
+            for(z = radius - 1; z >= 0; z--){
+              if(map[(y + 1) * (radius * radius) + x * radius + z] == 0 
+              || map[y * (radius * radius) + (x + 1) * radius + z] == 0
+              || map[y * (radius * radius) + x * radius + (z + 1)] == 0
+              || z == radius - 1 || x == radius - 1
+              || (map[y * (radius * radius) + (x - 1) * radius + z] == 0 && x != 0)
+              || map[(y - 1) * (radius * radius) + x * radius + z] == 0){
+                  if(map[y * (radius * radius) + x * radius + z] == 1 && x != radius){
+                    if(x == 0 && z == 0){
+                      //cube(x, y, z);
+                      //cube(x, -1 * y, z);
+                      surface += 2;
+                    } else {
+                      map[y * (radius * radius) + x * radius + z] = 2;
+                      //quad(x, y, z);
+                    }
+                  }
+              }
+            }
+          }
+        }
+      }
     }
     // Send data
     document.getElementById('dataForm').addEventListener('submit', async (e) => {
