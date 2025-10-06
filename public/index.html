@@ -27,14 +27,21 @@
     .render-canvas{
       text-align: center;
     }
-    .slice-canvas{
-      text-align: center;
-    } 
+    #slice-manager {
+      display: flex;
+      flex-direction: column; /* stack buttons vertically */
+      gap: 10px; /* spacing between buttons */
+    }
     .canvas{
         text-align: center;
     }
     .header{
       text-align: center;
+    }
+    #slice-manager button {
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -72,14 +79,12 @@
 
   <div class="render-canvas">
       <canvas id="render-canvas"></canvas>
+        <div id = "slice-manager">
+        <button onclick="viewSliceMap()">View slice map</button>
+      </div>
   </div>
 
   <div id="information" class = "field"></div>
-
-  <div class="slice-canvas">
-      <canvas id="slice-canvas" width="600px" height="600px" style="width: 40%; height: 40%; border: 1px solid black;">
-      </canvas>
-  </div>
 
   <form id="dataForm">
     <input type="text" id="userInput" placeholder="Enter message">
@@ -89,8 +94,68 @@
   <script src="https://cdn.jsdelivr.net/npm/mathjs@13.2.0/lib/browser/math.js"></script>
 
   <script>
-    const ctx = document.getElementById("slice-canvas").getContext('2d');
-    ctx.fillRect(0, 0, 10, 10)
+
+    let sliceMap = false;
+    let sliceLayer = 0;
+    let boundx = 0;
+    let boundy = 0;
+    let boundz = 0;
+    let globalParity = 0;
+    let globalY = 0;
+
+    function displaySlice(y){
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
+      if(globalParity == 1){
+          for(x = 0; x < boundx; x++){
+            for(z = 0; z < boundz; z++){
+                if(y >= 0){
+                if(map[(y * boundx * boundz) + (x * boundz) + z] == 1){
+                    if(x == 0 && z == 0){
+                      cube(x, y, z);
+                    } else {
+                      latheQuad(x, y, z);
+                    }
+                }
+              } else {
+                if(map[(-1 * y * boundx * boundz) + (x * boundz) + z] == 1){
+                    if(x == 0 && z == 0){
+                      cube(x, y, z);
+                    } else {
+                      latheQuad(x, y, z);
+                    }
+                }
+              }
+
+            }
+          }
+      }
+      displayInformation(y);
+    }
+
+    function viewSliceMap(){
+      if(sliceMap == false){
+        sliceMap = true;
+        document.getElementById("slice-manager").innerHTML = `
+          <button onclick="viewSliceMap()">View slice map</button>
+          <button onclick="upLayer()">Up a layer</button>
+          <button onclick="downLayer()">Down a layer</button>
+        `
+        displaySlice(globalY);
+      } else if (sliceMap == true) {
+        sliceMap = false;
+        document.getElementById("slice-manager").innerHTML = `
+          <button onclick="viewSliceMap()">View slice map</button>
+        `
+      }
+    }
+    function upLayer(){
+      globalY += 1;
+      displaySlice(globalY);
+    }
+    function downLayer(){
+      globalY -= 1;
+      displaySlice(globalY);
+    }
 
     let shape = document.getElementById("shape");
     let lathe = document.getElementById("lathe");
@@ -124,7 +189,7 @@
         latheSpecifications.innerHTML = "";
       }
     })
-
+    
     latheSpecifications.addEventListener("submit", function(e){
       e.preventDefault();
       let equation = e.target.querySelector("#formula").value.trim();
@@ -471,11 +536,17 @@
     function ellipse(length, width, height, parity){
       surface = 0;
       volume = 0;
+      boundx = width;
+      boundy = height;
+      boundz = length;
+      sliceMap = true;
+      viewSliceMap();
       // filling the map array with 0's
       map = new Array((length + 1) * (width + 1) * (height + 1)).fill(0);
       // Getting rid of all pre existing cubes from other functions
       scene.meshes.slice().forEach(mesh => mesh.dispose());
       if(parity == "1"){
+        globalParity = 1;
         // The seed cube
         cube(0, 0, 0);
         for(y = 0; y <= height; y++){
@@ -518,7 +589,6 @@
                       cube(x, -1 * y, z);
                       surface += 2;
                     } else {
-                      map[y * (width * length) + x * length + z] = 2;
                       quad(x, y, z);
                     }
                   }
@@ -527,6 +597,7 @@
           }
         }
       } else if (parity == "0"){
+        globalParity = 0;
         // The seed cube
         cube(0, 0, 0);
         cube(0, 0, 0);
@@ -587,6 +658,10 @@
     */
 
   function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, parity) {
+
+      sliceMap = true;
+      viewSliceMap();
+
       surface = 0;
       volume = 0;
       let a = scaleWidth;
@@ -598,6 +673,10 @@
       let width = (parseInt(majorRadius) + parseInt(minorRadius)) * Math.ceil(scaleWidth);
       let length = parseInt(minorRadius) * parseInt(scaleHeight);
       let height = (parseInt(majorRadius) + parseInt(minorRadius)) * Math.ceil(scaleLength);
+      
+      boundx = width;
+      boundy = height;
+      boundz = length;
       // filling the map array with 0's
       map = new Array((majorRadius * Math.ceil(scaleWidth) + 1) * (majorRadius * Math.ceil(scaleLength) + 1) * (minorRadius * Math.ceil(scaleHeight) + 1)).fill(0);
 
@@ -615,6 +694,7 @@
       // Getting rid of all pre existing cubes from other functions
       scene.meshes.slice().forEach(mesh => mesh.dispose());
       if(parity == "1"){ 
+        globalParity = 1;
         for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
           for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
             for(z = 0; z <= (minorRadius) * scaleHeight; z++){
@@ -670,7 +750,6 @@
                       cube(x, -1 * y, z);
                       surface += 2;
                     } else {
-                      map[y * (width * length) + x * length + z] = 2;
                       quad(x, y, z);
                     }
                   }
@@ -679,6 +758,7 @@
           }
         }
       } else if (parity == "0"){
+        globalParity = 0;
         for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
           for(x = 0; x <= (majorRadius + minorRadius) * scaleWidth; x++){
             for(z = 0; z <= (minorRadius) * scaleHeight; z++){
@@ -782,6 +862,9 @@
             radius = Math.floor(F(y)) + 1;
           }
         }
+        boundx = radius;
+        boundy = radiusStack.length;
+        boundz = radius;
       if(parity == "1"){
         for(y = 0; y <= radiusStack.length; y++){
           for(x = 0; x <= radius; x++){
