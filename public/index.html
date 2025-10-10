@@ -102,13 +102,23 @@
     let boundz = 0;
     let globalParity = 0;
     let globalY = 0;
+    let usingLathe = false;
 
     function displaySlice(y){
+      for(y = 0; y <= boundy; y++){
+        for(y = 0; y <= boundy; y++){
+          for(y = 0; y <= boundy; y++){
+            if(surfaceMap[(y * boundx * boundz) + (x * boundz) + z] == 1){
+              cube(x, y, z);
+            }
+          }
+        }
+      }
       scene.meshes.slice().forEach(mesh => mesh.dispose());
       if(globalParity == 1){
           for(x = 0; x < boundx; x++){
             for(z = 0; z < boundz; z++){
-                if(y >= 0){
+              if(y >= 1 || (y >= 0 && usingLathe == false)){
                 if(map[(y * boundx * boundz) + (x * boundz) + z] == 1){
                     if(x == 0 && z == 0){
                       cube(x, y, z);
@@ -116,7 +126,7 @@
                       latheQuad(x, y, z);
                     }
                 }
-              } else {
+              } else if (usingLathe == false) {
                 if(map[(-1 * y * boundx * boundz) + (x * boundz) + z] == 1){
                     if(x == 0 && z == 0){
                       cube(x, y, z);
@@ -128,9 +138,26 @@
 
             }
           }
+      } else {
+      if(globalParity == 0){
+          for(x = 0; x < boundx; x++){
+            for(z = 0; z < boundz; z++){
+              if(y >= 1 || (y >= 0 && usingLathe == false)){
+                if(map[(y * boundx * boundz) + (x * boundz) + z] == 1){
+                  evenLatheQuad(x, y, z);
+                }
+              } else if (usingLathe == false) {
+                if(map[(-1 * y * boundx * boundz) + (x * boundz) + z] == 1){
+                  evenLatheQuad(x, y, z);
+                }
+              }
+
+            }
+          }
       }
-      displayInformation(y);
+      displayInformation("Current layer : " + y);
     }
+  }
 
     function viewSliceMap(){
       if(sliceMap == false){
@@ -389,10 +416,13 @@
         cubes[cubes.length - 1].position.x = x;
         cubes[cubes.length - 1].position.y = y;
         cubes[cubes.length - 1].position.z = z;
+
+        surfaceMap.push(x,y,z);
     }
 
-    let map = []
-    let anchorPoints = []
+    let map = [];
+    let surfaceMap = [];
+    let anchorPoints = [];
 
     // SPHERE!!
 
@@ -525,6 +555,7 @@
 
         surface += 4
     }
+    
     /*
       In a nutshell, the ellipse function works by checking every single corner of each cube to see if it is less than the radius using the equation
       x^2/w^2 + y^2/h^2 + z^2/l^2 <= 1. Each successful cube placement is inserted into the map[] array for later optimization.
@@ -534,6 +565,8 @@
     */
 
     function ellipse(length, width, height, parity){
+      surfaceMap = [];
+      usingLathe = false;
       surface = 0;
       volume = 0;
       boundx = width;
@@ -658,7 +691,8 @@
     */
 
   function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, parity) {
-
+      surfaceMap = [];
+      usingLathe = false;
       sliceMap = true;
       viewSliceMap();
 
@@ -833,8 +867,12 @@
     */
 
     function latheFunc(equation, index1, index2, parity){
+      surfaceMap = [];
+      usingLathe = true;
       surface = 0;
       volume = 0;
+      sliceMap = true;
+      viewSliceMap();
       scene.meshes.slice().forEach(mesh => mesh.dispose());
       let expr = math.parse(equation);
       let F = (val) => expr.evaluate({ x: val });
@@ -863,9 +901,10 @@
           }
         }
         boundx = radius;
-        boundy = radiusStack.length;
-        boundz = radius;
+        boundy = radiusStack.length - 1;
+        boundz = radius;     
       if(parity == "1"){
+        globalParity = 1;
         for(y = 0; y <= radiusStack.length; y++){
           for(x = 0; x <= radius; x++){
             for(z = 0; z <= radius; z++){
@@ -892,7 +931,6 @@
                       cube(x, y, z);
                       surface += 1;
                     } else {
-                      map[y * (radius * radius) + x * radius + z] = 2;
                       latheQuad(x, y, z);
                     }
                   }
@@ -901,6 +939,7 @@
           }
         }
       } else if(parity == "0"){
+        globalParity = 0;
         for(y = 0; y <= radiusStack.length; y++){
           for(x = 0; x <= radius; x++){
             for(z = 0; z <= radius; z++){
@@ -927,7 +966,6 @@
                       evenLatheQuad(x, y, z);
                       surface += 1;
                     } else {
-                      map[y * (radius * radius) + x * radius + z] = 2;
                       evenLatheQuad(x, y, z);
                     }
                   }
