@@ -105,33 +105,27 @@
     let usingLathe = false;
 
     function displaySlice(y){
-      for(y = 0; y <= boundy; y++){
-        for(y = 0; y <= boundy; y++){
-          for(y = 0; y <= boundy; y++){
-            if(surfaceMap[(y * boundx * boundz) + (x * boundz) + z] == 1){
-              cube(x, y, z);
-            }
-          }
-        }
-      }
       scene.meshes.slice().forEach(mesh => mesh.dispose());
+      for(i = 0; i < surfaceMap.length; i++){
+        cube_trackless(surfaceMap[i].x, surfaceMap[i].y, surfaceMap[i].z);
+      }
       if(globalParity == 1){
           for(x = 0; x < boundx; x++){
             for(z = 0; z < boundz; z++){
               if(y >= 1 || (y >= 0 && usingLathe == false)){
                 if(map[(y * boundx * boundz) + (x * boundz) + z] == 1){
                     if(x == 0 && z == 0){
-                      cube(x, y, z);
+                      cube_trackless(x, y, z);
                     } else {
-                      latheQuad(x, y, z);
+                      latheQuad_trackless(x, y, z);
                     }
                 }
               } else if (usingLathe == false) {
                 if(map[(-1 * y * boundx * boundz) + (x * boundz) + z] == 1){
                     if(x == 0 && z == 0){
-                      cube(x, y, z);
+                      cube_trackless(x, y, z);
                     } else {
-                      latheQuad(x, y, z);
+                      latheQuad_trackless(x, y, z);
                     }
                 }
               }
@@ -144,14 +138,13 @@
             for(z = 0; z < boundz; z++){
               if(y >= 1 || (y >= 0 && usingLathe == false)){
                 if(map[(y * boundx * boundz) + (x * boundz) + z] == 1){
-                  evenLatheQuad(x, y, z);
+                  evenLatheQuad_trackless(x, y, z);
                 }
               } else if (usingLathe == false) {
-                if(map[(-1 * y * boundx * boundz) + (x * boundz) + z] == 1){
-                  evenLatheQuad(x, y, z);
+                if(map[((-1 * y - 1) * boundx * boundz) + (x * boundz) + z] == 1){
+                  evenLatheQuad_trackless(x, y, z);
                 }
               }
-
             }
           }
       }
@@ -175,10 +168,12 @@
         `
       }
     }
+
     function upLayer(){
       globalY += 1;
       displaySlice(globalY);
     }
+
     function downLayer(){
       globalY -= 1;
       displaySlice(globalY);
@@ -405,6 +400,50 @@
     boxMaterial.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
     const hl = new BABYLON.HighlightLayer("hl", scene);
 
+    function cube_trackless(x, y, z){
+        cubes.push(BABYLON.Mesh.CreateBox("box", 1, scene))
+        cubes[cubes.length - 1].material = boxMaterial;
+        cubes[cubes.length - 1].renderOutline = true;
+        cubes[cubes.length - 1].outlineColor = BABYLON.Color3.Black();
+        cubes[cubes.length - 1].enableEdgesRendering();
+        cubes[cubes.length - 1].edgesWidth = 1.0;
+        cubes[cubes.length - 1].edgesColor = new BABYLON.Color3(0, 0, 0);
+        cubes[cubes.length - 1].position.x = x;
+        cubes[cubes.length - 1].position.y = y;
+        cubes[cubes.length - 1].position.z = z;
+    }
+
+    function latheQuad_trackless(x, y, z){
+        if(x == 0 && z == 0){
+          cube_trackless(x,y,z);
+          surface += 1
+        } else if(x == 0){
+          cube_trackless(x, y, z);
+          cube_trackless(x, y, -1 * z);
+          surface += 2
+        } else if (z == 0){
+          cube_trackless(x, y, z);
+          cube_trackless(-1 * x, y, z);
+          surface += 2
+        } else {
+          cube_trackless(x, y, z);
+          cube_trackless(-1 * x, y, z);
+          cube_trackless(x, y, -1 * z);
+          cube_trackless(-1 * x, y, -1 * z);
+          surface += 4
+
+        }
+    }
+
+    function evenLatheQuad_trackless(x,y,z){
+        cube_trackless(x, y, z);
+        cube_trackless(-1 * x - 1, y, z);
+        cube_trackless(x, y, -1 * z - 1);
+        cube_trackless(-1 * x - 1, y, -1 * z - 1);
+
+        surface += 4
+    }
+
     function cube(x, y, z){
         cubes.push(BABYLON.Mesh.CreateBox("box", 1, scene))
         cubes[cubes.length - 1].material = boxMaterial;
@@ -417,14 +456,12 @@
         cubes[cubes.length - 1].position.y = y;
         cubes[cubes.length - 1].position.z = z;
 
-        surfaceMap.push(x,y,z);
+        surfaceMap.push({x,y,z});
     }
-
+    
     let map = [];
     let surfaceMap = [];
     let anchorPoints = [];
-
-    // SPHERE!!
 
     function volumeQuad(x, y, z){
       // Mostly used by the sphere function to mimic the quad() function to determine volume.
@@ -668,7 +705,6 @@
                     if(x == 0 && z == 0){
                       evenQuad(x, y, z);
                     } else {
-                      map[y * (width * length) + x * length + z] = 2;
                       evenQuad(x, y, z);
                     }
                   }
@@ -845,7 +881,6 @@
                       cube(x - 1, -1 * y - 1, z - 1);
                       surface += 8;
                     } else {
-                      map[y * (width * length) + x * length + z] = 2;
                       evenQuad(x, y, z);
                     }
                   }
