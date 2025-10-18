@@ -91,6 +91,9 @@
     <button type="submit">Send to Server</button>
   </form>
 
+  <button id="downloadSurface">Download Surface Coordinates</button>
+  <button id="downloadFull">Download Full Coordinates</button>
+
   <script src="https://cdn.jsdelivr.net/npm/mathjs@13.2.0/lib/browser/math.js"></script>
 
   <script>
@@ -106,9 +109,6 @@
 
     function displaySlice(y){
       scene.meshes.slice().forEach(mesh => mesh.dispose());
-      for(i = 0; i < surfaceMap.length; i++){
-        cube_trackless(surfaceMap[i].x, surfaceMap[i].y, surfaceMap[i].z);
-      }
       if(globalParity == 1){
           for(x = 0; x < boundx; x++){
             for(z = 0; z < boundz; z++){
@@ -613,12 +613,17 @@
       viewSliceMap();
       // filling the map array with 0's
       map = new Array((length + 1) * (width + 1) * (height + 1)).fill(0);
+        for(y = height; y >= 0; y--){
+          for(x = width - 1; x >= 0; x--){
+            for(z = length - 1; z >= 0; z--){
+              map[(y * width * length) + (x * length) + z] = 0;
+            }
+          }
+        }
       // Getting rid of all pre existing cubes from other functions
       scene.meshes.slice().forEach(mesh => mesh.dispose());
       if(parity == "1"){
         globalParity = 1;
-        // The seed cube
-        cube(0, 0, 0);
         for(y = 0; y <= height; y++){
           for(x = 0; x <= width; x++){
             for(z = 0; z <= length; z++){
@@ -668,16 +673,6 @@
         }
       } else if (parity == "0"){
         globalParity = 0;
-        // The seed cube
-        cube(0, 0, 0);
-        cube(0, 0, 0);
-        cube(-1, 0, 0);
-        cube(0, -1, 0);
-        cube(-1, -1, 0);
-        cube(0, 0, -1);
-        cube(-1, 0, -1);
-        cube(0, -1, -1);
-        cube(-1, -1, -1);
         for(y = 0; y <= height; y++){
           for(x = 0; x <= width; x++){
             for(z = 0; z <= length; z++){
@@ -1032,6 +1027,40 @@
       const result = await res.json();
       alert(result.status);
 
+      });
+
+      document.getElementById("downloadSurface").addEventListener("click", function () {
+        let text = "";
+        for(i = 0; i < surfaceMap.length; i++){
+          text += "[" + surfaceMap[i].x + "," + surfaceMap[i].y + "," + surfaceMap[i].z + "]" + ",";
+        }
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "sample.txt";
+        a.click();
+        URL.revokeObjectURL(url); // cleanup
+      });
+
+      document.getElementById("downloadFull").addEventListener("click", function () {
+        let text = "";
+        for(y = -1 * boundy; y < boundy; y++){
+          for(x = -1 * boundx; x < boundx; x++){
+            for(z = -1 * boundz; z < boundz; z++){
+              if(map[(y * boundx * boundz) + (x * boundz) + z] == 1){
+                text += "[" + x + "," + y + "," + z + "]" + ",";
+              }
+            }
+          }
+        }
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "sample.txt";
+        a.click();
+        URL.revokeObjectURL(url); // cleanup
       });
   </script>
 </body>
