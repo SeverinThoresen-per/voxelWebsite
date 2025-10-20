@@ -37,6 +37,9 @@ app.listen(PORT, () => {
 
 ///path is var/lib/mysql/BlockFiller/data.ibd
 
+// To access database manually : 
+  //mysql -u <username> -p <database_name>
+
 const pool = mysql.createPool({
   host: 'localhost',
   user: 'BlockFillerAgent',
@@ -53,7 +56,17 @@ module.exports = promisePool;
 async function addData(){
     //INSERT INTO table_name (column1, column2) VALUES (value1, value2)
   try {
-    //const [rows] = await promisePool.query('INSERT INTO data (');
+    const [rows] = await promisePool.query('INSERT INTO BlockFiller (column1, column2) VALUES (value1, value2)');
+    console.log(rows);
+  } catch (err) {
+    console.error('Database query failed:', err);
+  }
+}
+
+async function deleteAllData(){
+    //DELETE FROM table_name
+  try {
+    const [rows] = await promisePool.query('DELETE FROM table_name');
     console.log(rows);
   } catch (err) {
     console.error('Database query failed:', err);
