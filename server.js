@@ -23,8 +23,36 @@ app.post('/api/data', (req, res) => {
   
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.use(bodyParser.json({limit: '100kb'}));
+
+//Tracker
+
+app.post('/track', async (req, res) => {
+  const ua  = req.headers['user-agent'] || '';
+  const ref = req.headers['referer']     || req.body.referrer || null;
+  const xff = req.headers['x-forwarded-for'];
+  let ip = xff ? xff.split(',')[0].trim() : req.socket.remoteAddress;
+
+  if (ip && ip.includes('.')) {
+    ip = ip.split('.').slice(0,3).join('.') + '.0'
+  }
+
+  const record = {
+    event: req.body.name,
+    url:   req.body.url,
+    ts:    req.body.ts,
+    ua,
+    ref,
+    ip
+  };
+
+  const exists = await checkData(ua, ip);
+
+  if (!exists) {
+    await addData(record);
+  }
+
+  res.status(204).end();
 });
 
 ////////////////////////////////////////////////////////////////////////
@@ -53,21 +81,20 @@ const pool = mysql.createPool({
 const promisePool = pool.promise();
 module.exports = promisePool;
 
-async function addData(){
-    //INSERT INTO table_name (column1, column2) VALUES (value1, value2)
-  try {
-    const [rows] = await promisePool.query('INSERT INTO BlockFiller (column1, column2) VALUES (value1, value2)');
-    console.log(rows);
-  } catch (err) {
-    console.error('Database query failed:', err);
-  }
-}
+//INSERT INTO table_name (column1, column2) VALUES (value1, value2);
+//DELETE FROM table_name;
+//SHOW TABLES;
+//USE database_name;
+//CREATE TABLE <name>(<key variable> <type, usually int for this>, ... etc);
+//DROP TABLE <name>;
 
-async function deleteAllData(){
-    //DELETE FROM table_name
+async function addData(record) {
   try {
-    const [rows] = await promisePool.query('DELETE FROM table_name');
-    console.log(rows);
+  await promisePool.query(
+    `INSERT INTO events (event, url, ts, ua, ref, ip)
+    VALUES (?, ?, ?, ?, ?, ?)`,
+    [record.event, record.url, record.ts, record.ua, record.ref, record.ip]
+  );
   } catch (err) {
     console.error('Database query failed:', err);
   }
@@ -75,14 +102,27 @@ async function deleteAllData(){
 
 async function getData() {
   try {
-    const [rows] = await promisePool.query('SELECT * FROM data');
+    const [rows] = await promisePool.query('SELECT * FROM events');
     console.log(rows);
   } catch (err) {
     console.error('Database query failed:', err);
   }
 }
 
-getData();
+async function checkData(ua, ip) {
+  try {
+    const [rows] = await promisePool.query(
+      `SELECT EXISTS (
+        SELECT 1 FROM events WHERE ua = ? AND ip = ? LIMIT 1
+      ) AS found`,
+      [ua, ip]
+    );
+    return rows[0].found === 1;
+  } catch (err) {
+    console.error('Database query failed:', err);
+    return false;
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

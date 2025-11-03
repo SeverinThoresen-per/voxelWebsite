@@ -45,6 +45,21 @@
     }
   </style>
 </head>
+<script>
+function sendEvent(name, payload = {}) {
+  const data = {
+    name,
+    url: location.href,
+    referrer: document.referrer || null,
+    ua: navigator.userAgent,
+    ts: Date.now(),
+    ...payload
+  };
+  const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+  navigator.sendBeacon('/track', blob);
+}
+sendEvent('page_view');
+</script>
 <body>
   <h1 class="title">Optimal Cube Shapes</h1>
 
@@ -979,7 +994,9 @@
     }
 
     /*
-      The lathe 
+      This is the lathe function. It runs a for loop from index1 to index2, inputs those indexes into the equation,
+      and takes the output of the equation at any given index as the radius of a circle to be drawn. It essentially
+      swivels a given function around the y axis to create a 3d shape
     */
 
     function latheFunc(equation, index1, index2, parity){
