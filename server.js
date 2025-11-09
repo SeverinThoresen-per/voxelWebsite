@@ -2,6 +2,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const mysql = require('mysql2');
+require('dotenv').config()
+
+const username = process.env.username
+const password = process.env.password
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,11 +50,8 @@ app.post('/track', async (req, res) => {
     ip
   };
 
-  const exists = await checkData(ua, ip);
-
-  if (!exists) {
-    await addData(record);
-  }
+  await insertIfNotExists(record)
+  await getData()
 
   res.status(204).end();
 });
@@ -70,8 +71,8 @@ app.post('/track', async (req, res) => {
 
 const pool = mysql.createPool({
   host: 'localhost',
-  user: 'BlockFillerAgent',
-  password: 'mysqQFT71$',
+  user: username,
+  password: password,
   database: 'BlockFiller',
   waitForConnections: true,
   connectionLimit: 10,
@@ -88,16 +89,14 @@ module.exports = promisePool;
 //CREATE TABLE <name>(<key variable> <type, usually int for this>, ... etc);
 //DROP TABLE <name>;
 
-async function addData(record) {
-  try {
-  await promisePool.query(
-    `INSERT INTO events (event, url, ts, ua, ref, ip)
-    VALUES (?, ?, ?, ?, ?, ?)`,
-    [record.event, record.url, record.ts, record.ua, record.ref, record.ip]
+async function insertIfNotExists(record) {
+  const [result] = await promisePool.query(
+    `INSERT IGNORE INTO events (event, url, ts, ua, ref, ip)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [record.event, record.url, 0, record.ua, record.ref, record.ip]
   );
-  } catch (err) {
-    console.error('Database query failed:', err);
-  }
+  // If affectedRows === 1 -> inserted. If 0 -> duplicate hit the unique key.
+  return result.affectedRows === 1;
 }
 
 async function getData() {
@@ -109,18 +108,11 @@ async function getData() {
   }
 }
 
-async function checkData(ua, ip) {
+async function deleteAll() {
   try {
-    const [rows] = await promisePool.query(
-      `SELECT EXISTS (
-        SELECT 1 FROM events WHERE ua = ? AND ip = ? LIMIT 1
-      ) AS found`,
-      [ua, ip]
-    );
-    return rows[0].found === 1;
+    const [rows] = await promisePool.query('DELETE FROM events');
   } catch (err) {
     console.error('Database query failed:', err);
-    return false;
   }
 }
 
