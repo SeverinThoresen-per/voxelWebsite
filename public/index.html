@@ -4,13 +4,17 @@
     <script src="https://cdn.babylonjs.com/v7.34.1/babylon.js"></script>
   <meta charset="UTF-8">
   <style>
+    body{
+      background-color: #00293b;
+    }
     .title{
         font-family: Arial, Helvetica, sans-serif;
         text-align: center;
         font-size: 35px;
+        color: white;
     }
     .field{
-        background-color: grey;
+        background-color: #004b6c;
         padding: 20px;
         border-radius: 10px;
         border-style: double;
@@ -61,7 +65,7 @@ function sendEvent(name, payload = {}) {
 sendEvent('page_view');
 </script>
 <body>
-  <h1 class="title">Optimal Cube Shapes</h1>
+  <h1 class="title">Voxel Shape Generator</h1>
 
   <div class="field">
     <h2 class="header">Spheres, Ovoids, and Toroids</h2>
@@ -100,11 +104,6 @@ sendEvent('page_view');
   </div>
 
   <div id="information" class = "field"></div>
-
-  <form id="dataForm">
-    <input type="text" id="userInput" placeholder="Enter message">
-    <button type="submit">Send to Server</button>
-  </form>
 
   <button id="downloadSurface">Download Surface Coordinates</button>
 
