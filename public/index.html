@@ -96,7 +96,6 @@ sendEvent('page_view');
     // and is defined by following the program's logic throughout the lathe, ellipse, and toroid functions
 
     function displayFull(){
-      scene.meshes.slice().forEach(mesh => mesh.dispose());
         let text = "";
         for(i = 0; i < globalMap.length; i++){
           text += "[" + globalMap[i][0] + "," + globalMap[i][1] + "," + globalMap[i][2] + "]" + ",";
