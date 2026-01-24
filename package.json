@@ -1,7 +1,16 @@
 {
+  "name": "voxelGenerator",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
+    "body-parser": "^2.2.2",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "mysql2": "^3.14.3"
+    "express": "^5.2.1",
+    "mysql2": "^3.16.1",
+    "sequelize": "^6.37.7"
   }
 }

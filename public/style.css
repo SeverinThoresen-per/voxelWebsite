@@ -1,8 +1,7 @@
-/* ===== Global ===== */
 :root {
-  --bg-dark: #012533;
-  --bg-mid: #01405a;
-  --bg-light: #005377;
+  --bg-dark: #0f1724;
+  --bg-mid: #090089;
+  --bg-light: #00358c;
 
   --border: #0a0a0a;
   --text-light: #ffffff;
@@ -13,36 +12,35 @@
 
 body {
   margin: 0;
-  padding: 20px;
   background-color: var(--bg-dark);
   font-family: Arial, Helvetica, sans-serif;
   color: var(--text-light);
 }
 
-/* ===== Titles ===== */
 .title {
-  text-align: center;
   font-size: 42px;
-  margin-bottom: 25px;
+  margin: 25px;
   font-weight: 700;
+  text-align: center;
+  border:none;
 }
 
-/* ===== Panels / Cards ===== */
 .field {
+  margin: 30px;
   background-color: var(--bg-mid);
   padding: 20px 25px;
   border-radius: var(--radius);
   border: 3px solid var(--border);
   margin-bottom: 25px;
   box-shadow: var(--shadow);
+  border:none;
 }
 
 .header {
-  text-align: center;
   margin-top: 0;
+  border:none;
 }
 
-/* ===== Select Elements ===== */
 select {
   width: 100%;
   padding: 10px;
@@ -52,7 +50,7 @@ select {
   background-color: var(--bg-light);
   color: var(--text-light);
   border: 2px solid black;
-  outline: none;
+  border: none;
   cursor: pointer;
 }
 
@@ -60,7 +58,6 @@ select:hover {
   background-color: #006c98;
 }
 
-/* ===== Canvas ===== */
 canvas {
   width: 70vw;
   height: 70vh;
@@ -69,15 +66,25 @@ canvas {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   background: #000;
+  border:none;
 }
 
-/* Wrapper to center the canvas */
+.banner {
+  width:100vw;
+  display:flex;
+  text-align: center;
+  top:0;
+  left:0;
+  box-shadow: var(--shadow);
+  background-color: #090d14;
+}
+
 .render-canvas {
   text-align: center;
   margin-top: 30px;
+  border:none;
 }
 
-/* ===== Slice Manager ===== */
 #slice-manager {
   margin-top: 20px;
   display: flex;
@@ -86,54 +93,60 @@ canvas {
   gap: 12px;
 }
 
-/* ===== Buttons ===== */
 button, #slice-manager button, #downloadSurface {
-  padding: 10px 18px;
+  margin: 10px;
+  margin-left: 30px;
+  padding: 10px;
   font-size: 16px;
   font-weight: 600;
   border-radius: var(--radius);
   background-color: var(--bg-light);
   color: var(--text-light);
-  border: 2px solid black;
   cursor: pointer;
   transition: 0.15s ease;
   box-shadow: var(--shadow);
+  border:none;
 }
 
 button:hover {
   background-color: #0078a8;
-  transform: translateY(-2px);
 }
 
 button:active {
-  transform: scale(0.97);
+  border:none;
 }
 
-/* ===== Information Box ===== */
 #information {
   min-height: 40px;
   padding: 20px;
   text-align: center;
   font-size: 18px;
+  border:none;
 }
 
-/* ===== Responsive Layout ===== */
 @media (max-width: 768px) {
   canvas {
     width: 90vw;
     height: 60vh;
+    border:none;
   }
 
   .title {
     font-size: 32px;
+    border:none;
   }
 
   .field {
+    outline:none;
+    margin: 15px;
     padding: 15px;
+    border:none;
   }
 
   button {
     font-size: 14px;
+    margin: 30px;
     padding: 8px 15px;
+    border:none;
   }
 }

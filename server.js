@@ -4,56 +4,51 @@ const path = require('path');
 const mysql = require('mysql2');
 require('dotenv').config()
 
-const username = process.env.username
-const password = process.env.password
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Api stuff
-app.use(bodyParser.json());
+app.set('trust proxy', true);
+
+app.use(express.json({ limit: '100kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
 
-let storedData = { message: "server" };
-
-app.get('/api/data', (req, res) => {
-  res.json(storedData);
-});
-
-app.post('/api/data', (req, res) => {
-  console.log("Received data:", req.body);
-  res.json({status : req.body.message})
-  
-});
-
-app.use(bodyParser.json({limit: '100kb'}));
+function respond(message){
+  console.log(message);
+}
 
 //Tracker
 
 app.post('/track', async (req, res) => {
-  const ua  = req.headers['user-agent'] || '';
-  const ref = req.headers['referer']     || req.body.referrer || null;
-  const xff = req.headers['x-forwarded-for'];
-  let ip = xff ? xff.split(',')[0].trim() : req.socket.remoteAddress;
+  try {
+    console.log("/Track path trigger no : 1");
+    const { name, url, ts } = req.body;
+    if (!name || !url || !ts) {
+      return res.sendStatus(400);
+    }
 
-  if (ip && ip.includes('.')) {
-    ip = ip.split('.').slice(0,3).join('.') + '.0'
+    const record = {
+      event: name,
+      url,
+      ts,
+      ua: req.headers['user-agent'] || '',
+      ref: req.headers.referer || null,
+      ip: req.ip
+    };
+
+    await insertIfNotExists(record);
+    res.sendStatus(204);
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
   }
+});
 
-  const record = {
-    event: req.body.name,
-    url:   req.body.url,
-    ts:    req.body.ts,
-    ua,
-    ref,
-    ip
-  };
+app.get('/track', async (req, res) => {
+    respond("the get path triggered");
+    res.sendStatus(204);
+});
 
-  await insertIfNotExists(record)
-  await getData()
-
-  res.status(204).end();
+app.get('/api/data', (req, res) => {
+  res.json({ message: 'Hello from the server', time: Date.now() });
 });
 
 ////////////////////////////////////////////////////////////////////////
@@ -70,9 +65,9 @@ app.post('/track', async (req, res) => {
   //mysql -u <username> -p <database_name>
 
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: username,
-  password: password,
+  host: 'voxelgenerator.cufce0g48y9x.us-east-1.rds.amazonaws.com',
+  user: process.env.username,
+  password: process.env.password,
   database: 'BlockFiller',
   waitForConnections: true,
   connectionLimit: 10,
@@ -93,7 +88,7 @@ async function insertIfNotExists(record) {
   const [result] = await promisePool.query(
     `INSERT IGNORE INTO events (event, url, ts, ua, ref, ip)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [record.event, record.url, 0, record.ua, record.ref, record.ip]
+    [record.event, record.url, record.ts, record.ua, record.ref, record.ip]
   );
   // If affectedRows === 1 -> inserted. If 0 -> duplicate hit the unique key.
   return result.affectedRows === 1;
@@ -118,4 +113,4 @@ async function deleteAll() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+app.listen(process.env.PORT || 8080, () => console.log('Server running '));

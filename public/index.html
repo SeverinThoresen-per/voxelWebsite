@@ -8,20 +8,30 @@
 <script>
 function sendEvent(name, payload = {}) {
   const data = {
-    name,
+    name: "Track Packet",
     url: location.href,
     referrer: document.referrer || null,
     ua: navigator.userAgent,
-    ts: Date.now(),
+    ts: Math.floor(Date.now() / 1000 / 60),
     ...payload
   };
-  const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
-  navigator.sendBeacon('/track', blob);
+
+  fetch('/track', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data),
+    keepalive: true
+  }).catch(() => {});
 }
+
 sendEvent('page_view');
 </script>
 <body>
-  <h1 class="title">Voxel Shape Generator</h1>
+  <div class="banner">
+    <h1 class="title">Voxel Shape Generator</h1>
+  </div>
 
   <div class="field">
     <h2 class="header">Spheres, Ovoids, and Toroids</h2>
@@ -61,7 +71,9 @@ sendEvent('page_view');
 
   <div id="information" class = "field"></div>
 
-  <button id="downloadSurface">Download Surface Coordinates</button>
+  <button id="downloadSurface">Download Surface Voxel Coordinates</button>
+
+  <button id="downloadFull" onclick=displayFull()>Download All Voxel Coordinates</button>
 
   <script src="https://cdn.jsdelivr.net/npm/mathjs@13.2.0/lib/browser/math.js"></script>
 
@@ -77,11 +89,42 @@ sendEvent('page_view');
     let globalParity = 0;
     let globalY = 0;
     let usingLathe = false;
+    let globalMap = [];
+
+    // displayFull is used to calculate every voxel coordinate for the "download all voxel coordinates" button functionality.
+    // because. It works by reading the globalMap[] array which is an array of coordinates representing every voxel on a given shape,
+    // and is defined by following the program's logic throughout the lathe, ellipse, and toroid functions
+
+    function displayFull(){
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
+        let text = "";
+        for(i = 0; i < globalMap.length; i++){
+          text += "[" + globalMap[i][0] + "," + globalMap[i][1] + "," + globalMap[i][2] + "]" + ",";
+        }
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "full.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // displaySlice wipes away most of the generated shape, this function
+    // regenerates the shape to reverse the sliceMap.
+
+    function redisplayShape(){
+      scene.meshes.slice().forEach(mesh => mesh.dispose());
+        for (i = 0; i < surfaceMap.length; i++){
+          cube_trackless(surfaceMap[i].x, surfaceMap[i].y, surfaceMap[i].z);
+        }
+    }
 
     //displySlice takes a y value, iterates through the map[] array using the global bounds,
     //and draws cubes anywhere at the y value where map[] == 1
 
     function displaySlice(y){
+      displayInformation("Current layer : " + y);
       scene.meshes.slice().forEach(mesh => mesh.dispose());
       if(globalParity == 1){
 
@@ -127,7 +170,6 @@ sendEvent('page_view');
             }
           }
       }
-      displayInformation("Current layer : " + y);
     }
   }
 
@@ -149,6 +191,7 @@ sendEvent('page_view');
         document.getElementById("slice-manager").innerHTML = `
           <button onclick="viewSliceMap()">View slice map</button>
         `
+        redisplayShape();
       }
     }
 
@@ -176,12 +219,24 @@ sendEvent('page_view');
     let speech = "";
     let mode = "none";
 
+    const parityPrompt = `
+    <br>
+    <br>
+            <label for="parity">What is the line of symetry?</label>
+              <select name="parity" id="parity" type="parity">
+                <option value="1">The center of a block</option>
+                <option value="0">In between two blocks</option>
+              </select>
+    <br>
+    `;
+
     //This listens for when the user changes the dropdown in the lathe div, and
     //applies the appropriate html.
 
     lathe.addEventListener("change", function(e){
       if(this.value == "on"){
             latheSpecifications.innerHTML = `
+            <br>
             <form id="latheParameters" novalidate>
             <label for="formula">Formula: </label>
             <input type="text" id="formula" name="formula" required>
@@ -192,11 +247,7 @@ sendEvent('page_view');
             <label for="index2">Index 2: </label>
             <input type="text" id="index2" name="index2" required>
 
-            <label for="parity">Even or Odd?</label>
-              <select name="parity" id="parity" type="parity">
-                <option value="1">Odd</option>
-                <option value="0">Even</option>
-              </select>
+            ` + parityPrompt + `
 
             <button type="submit">Generate</button>
           </form>
@@ -270,16 +321,15 @@ sendEvent('page_view');
       if (this.value == "sphere") {
         mode = "sphere";
         specifications.innerHTML = `
+        <br>
           <form id="parameters" novalidate>
             <label for="radius">Radius:</label>
 
             <input type="number" min="0" step="1" id="radius" name="radius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
-            <label for="parity">Even or Odd?</label>
-              <select name="parity" id="parity" type="parity">
-                <option value="1">Odd</option>
-                <option value="0">Even</option>
-              </select>
+
+            ` + parityPrompt + `
+
 
             <button type="submit">Generate</button>
           </form>
@@ -287,6 +337,7 @@ sendEvent('page_view');
       } else if(this.value == "ellipse"){
           mode = "ellipse";
             specifications.innerHTML = `
+            <br>
             <form id="parameters">
               <label for="width">width: </label>
               <input type="number" min="0" step="1" id="width" name="width" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
@@ -297,11 +348,9 @@ sendEvent('page_view');
               <label for="height">height:</label>
               <input type="number" min="0" step="1" id="height" name="height" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
-            <label for="parity">Even or Odd?</label>
-              <select name="parity" id="parity" type="parity">
-                <option value="1">Odd</option>
-                <option value="0">Even</option>
-              </select>
+
+            ` + parityPrompt + `
+
 
               <button type="submit">Generate</button>
             </form>
@@ -309,6 +358,7 @@ sendEvent('page_view');
         } else if(this.value == "toroid"){
           mode = "toroid";
             specifications.innerHTML = `
+            <br>
             <form id="parameters">
               <label for="majorRadius">Major Radius:</label>
               <input type="number" min="0" step="1" id="majorRadius" name="majorRadius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
@@ -316,11 +366,9 @@ sendEvent('page_view');
               <label for="minorRadius">Minor Radius:</label>
               <input type="number" min="0" step="1" id="minorRadius" name="minorRadius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
-            <label for="parity">Even or Odd?</label>
-              <select name="parity" id="parity" type="parity">
-                <option value="1">Odd</option>
-                <option value="0">Even</option>
-              </select>
+
+            ` + parityPrompt + `
+
 
               <button type="submit">Generate</button>
             </form>
@@ -329,6 +377,7 @@ sendEvent('page_view');
           mode = "elliptical toroid";
             specifications.innerHTML = `
             <form id="parameters">
+              <br>
               <label for="majorRadius">Major Radius:</label>
               <input type="number" min="0" step="1" id="majorRadius" name="majorRadius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
@@ -341,11 +390,9 @@ sendEvent('page_view');
               <label for="minorRadius">Minor Radius:</label>
               <input type="number" step="1" min="0" id="minorRadius" name="minorRadius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
-            <label for="parity">Even or Odd?</label>
-              <select name="parity" id="parity" type="parity">
-                <option value="1">Odd</option>
-                <option value="0">Even</option>
-              </select>
+
+            ` + parityPrompt + `
+
 
               <button type="submit">Generate</button>
             </form>
@@ -354,6 +401,7 @@ sendEvent('page_view');
           mode = "elliptical toroid with elliptical cross section";
             specifications.innerHTML = `
             <form id="parameters">
+              <br>
               <label for="majorRadius">Major Radius:</label>
               <input type="number" min="0" step="1" id="majorRadius" name="majorRadius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
@@ -369,11 +417,9 @@ sendEvent('page_view');
               <label for="minorRadius">Minor Radius:</label>
               <input type="number" step="1" min="0" id="minorRadius" name="minorRadius" oninput="this.value = this.value.replace(/[^0-9\-]/g, '')" required>
 
-            <label for="parity">Even or Odd?</label>
-              <select name="parity" id="parity" type="parity">
-                <option value="1">Odd</option>
-                <option value="0">Even</option>
-              </select>
+
+            ` + parityPrompt + `
+
             
               <button type="submit">Generate</button>
             </form>
@@ -662,6 +708,7 @@ sendEvent('page_view');
       boundy = height;
       boundz = length;
       sliceMap = true;
+      globalMap = [];
       viewSliceMap();
       // filling the map array with 0's
       map = new Array((length + 1) * (width + 1) * (height + 1)).fill(0);
@@ -706,6 +753,46 @@ sendEvent('page_view');
         for(y = height; y >= 0; y--){
           for(x = width - 1; x >= 0; x--){
             for(z = length - 1; z >= 0; z--){
+
+              if(map[y * (width * length) + x * length + z] == 1){
+                if (x == 0 && z == 0 && y == 0){
+                  globalMap.push([x, y, z]);
+                } else if(x == 0 && z == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([x, -1 * y, z]);
+                  surface += 2;
+                } else {
+                if(x == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([x, y, -1 * z]);
+                  if(y != 0){
+                    globalMap.push([x, -1 * y, z]);
+                    globalMap.push([x, -1 * y, -1 * z]);
+                  }
+                } else if (z == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x, y, z]);
+                  if(y != 0){
+                    globalMap.push([x, -1 * y, z]);
+                    globalMap.push([-1 * x, -1 * y, z]);
+                  }
+                } else {
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x, y, z]);
+                  globalMap.push([x, y, -1 * z]);
+                  globalMap.push([-1 * x, y, -1 * z]);
+
+                if (y != 0){
+                  globalMap.push([x, -1 * y, z]);
+                  globalMap.push([-1 * x, -1 * y, z]);
+                  globalMap.push([x, -1 * y, -1 * z]);
+                  globalMap.push([-1 * x, -1 * y, -1 * z]);
+                  }
+
+                }
+              }
+            }
+
               if(map[(y + 1) * (width * length) + x * length + z] == 0 
               || map[y * (width * length) + (x + 1) * length + z] == 0
               || map[y * (width * length) + x * length + (z + 1)] == 0
@@ -723,6 +810,13 @@ sendEvent('page_view');
             }
           }
         }
+        //
+        //
+        //
+        //    vvvvv ALERT : CHANGING PARITY TO EVEN vvvvv
+        //
+        //
+        //
       } else if (parity == "0"){
         globalParity = 0;
         for(y = 0; y <= height; y++){
@@ -744,6 +838,19 @@ sendEvent('page_view');
         for(y = height; y >= 0; y--){
           for(x = width - 1; x >= 0; x--){
             for(z = length - 1; z >= 0; z--){
+
+              if(map[y * (width * length) + x * length + z] == 1){
+                globalMap.push([x, y, z]);
+                globalMap.push([-1 * x - 1, y, z]);
+                globalMap.push([x, y, -1 * z - 1]);
+                globalMap.push([-1 * x - 1, y, -1 * z - 1]);
+
+                globalMap.push([x, -1 * y - 1, z]);
+                globalMap.push([-1 * x - 1, -1 * y - 1, z]);
+                globalMap.push([x, -1 * y - 1, -1 * z - 1]);
+                globalMap.push([-1 * x - 1, -1 * y - 1, -1 * z - 1]);
+              }
+
               if(map[(y + 1) * (width * length) + x * length + z] == 0 
               || map[y * (width * length) + (x + 1) * length + z] == 0
               || map[y * (width * length) + x * length + (z + 1)] == 0
@@ -777,6 +884,7 @@ sendEvent('page_view');
     */
 
   function toroid(scaleWidth, scaleLength, scaleHeight, majorRadius, minorRadius, parity) {
+      globalMap = [];
       surfaceMap = [];
       fullMap = [];
       usingLathe = false;
@@ -859,6 +967,44 @@ sendEvent('page_view');
         for(y = height; y >= 0; y--){
           for(x = width - 1; x >= 0; x--){
             for(z = length - 1; z >= 0; z--){
+              
+              if(map[y * (width * length) + x * length + z] == 1 && x != width){
+                if (x == 0 && z == 0 && y == 0){
+                  globalMap.push([x, y, z]);
+                } else if(x == 0 && z == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([x, -1 * y, z]);
+                } else {
+                if(x == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([x, y, -1 * z]);
+                  if(y != 0){
+                    globalMap.push([x, -1 * y, z]);
+                    globalMap.push([x, -1 * y, -1 * z]);
+                  }
+                } else if (z == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x, y, z]);
+                  if(y != 0){
+                    globalMap.push([x, -1 * y, z]);
+                    globalMap.push([-1 * x, -1 * y, z]);
+                  }
+                } else {
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x, y, z]);
+                  globalMap.push([x, y, -1 * z]);
+                  globalMap.push([-1 * x, y, -1 * z]);
+                if (y != 0){
+                  globalMap.push([x, -1 * y, z]);
+                  globalMap.push([-1 * x, -1 * y, z]);
+                  globalMap.push([x, -1 * y, -1 * z]);
+                  globalMap.push([-1 * x, -1 * y, -1 * z]);
+                }
+
+                }
+                }
+              }
+              
               if(map[(y + 1) * (width * length) + x * length + z] == 0 
               || map[y * (width * length) + (x + 1) * length + z] == 0
               || map[y * (width * length) + x * length + (z + 1)] == 0
@@ -878,6 +1024,13 @@ sendEvent('page_view');
             }
           }
         }
+        //
+        //
+        //
+        //    vvvvv ALERT : CHANGING PARITY TO EVEN vvvvv
+        //
+        //
+        //
       } else if (parity == "0"){
         globalParity = 0;
         for(y = 0; y <= (majorRadius + minorRadius) * scaleLength; y++){
@@ -913,6 +1066,31 @@ sendEvent('page_view');
         for(y = height; y >= 0; y--){
           for(x = width - 1; x >= 0; x--){
             for(z = length - 1; z >= 0; z--){
+
+              if(map[y * (width * length) + x * length + z] == 1 && x != width){
+                if(x == 0 && z == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([x, -1 * y - 1, z]);
+                  globalMap.push([x - 1, y, z]);
+                  globalMap.push([x - 1, -1 * y - 1, z]);
+
+                  globalMap.push([x, y, z - 1]);
+                  globalMap.push([x, -1 * y - 1, z - 1]);
+                  globalMap.push([x - 1, y, z - 1]);
+                  globalMap.push([x - 1, -1 * y - 1, z - 1]);
+                } else {
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x - 1, y, z]);
+                  globalMap.push([x, y, -1 * z - 1]);
+                  globalMap.push([-1 * x - 1, y, -1 * z - 1]);
+
+                  globalMap.push([x, -1 * y - 1, z]);
+                  globalMap.push([-1 * x - 1, -1 * y - 1, z]);
+                  globalMap.push([x, -1 * y - 1, -1 * z - 1]);
+                  globalMap.push([-1 * x - 1, -1 * y - 1, -1 * z - 1]);
+                }
+              }
+
               if(map[(y + 1) * (width * length) + x * length + z] == 0 
               || map[y * (width * length) + (x + 1) * length + z] == 0
               || map[y * (width * length) + x * length + (z + 1)] == 0
@@ -941,7 +1119,7 @@ sendEvent('page_view');
         }
       }
       if(true){
-        speech = "Total volume of the shape is : " + volume + ", " + surface + " required for the surface";
+        speech = "Total volume of the shape is : " + globalMap.length + ", " + surface + " required for the surface";
       } else {
         speech = "Radius is too small for calculations";
       }
@@ -955,6 +1133,8 @@ sendEvent('page_view');
     */
 
     function latheFunc(equation, index1, index2, parity){
+      globalMap = [];
+      mode = "lathe";
       surfaceMap = [];
       fullMap = [];
       usingLathe = true;
@@ -1009,6 +1189,29 @@ sendEvent('page_view');
         for(y = 0; y <= radiusStack.length; y++){
           for(x = 0; x <= radius - 1; x++){
             for(z = 0; z <= radius - 1; z++){
+
+              if(map[y * (radius * radius) + x * radius + z] == 1 && x != radius && y != 0){
+                if(x == 0 && z == 0){
+                  globalMap.push([x, y, z]);
+                } else {
+                if(x == 0 && z == 0){
+                  globalMap.push([x,y,z]);
+                } else if(x == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([x, y, -1 * z]);
+                } else if (z == 0){
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x, y, z]);
+                } else {
+                  globalMap.push([x, y, z]);
+                  globalMap.push([-1 * x, y, z]);
+                  globalMap.push([x, y, -1 * z]);
+                  globalMap.push([-1 * x, y, -1 * z]);
+
+                }
+                }
+              }
+
               if(map[(y + 1) * (radius * radius) + x * radius + z] == 0 
               || map[y * (radius * radius) + (x + 1) * radius + z] == 0
               || map[y * (radius * radius) + x * radius + (z + 1)] == 0
@@ -1027,6 +1230,13 @@ sendEvent('page_view');
             }
           }
         }
+        //
+        //
+        //
+        //   vvv CHANGING PARITY TO EVEN vvv
+        //
+        //
+        //
       } else if(parity == "0"){
         globalParity = 0;
         for(y = 0; y <= radiusStack.length; y++){
@@ -1044,6 +1254,14 @@ sendEvent('page_view');
         for(y = 0; y <= radiusStack.length; y++){
           for(x = 0; x <= radius - 1; x++){
             for(z = 0; z <= radius - 1; z++){
+
+              if(map[y * (radius * radius) + x * radius + z] == 1 && x != radius && y != 0){
+                globalMap.push([x, y, z]);
+                globalMap.push([-1 * x - 1, y, z]);
+                globalMap.push([x, y, -1 * z - 1]);
+                globalMap.push([-1 * x - 1, y, -1 * z - 1]);
+              }
+
               if(map[(y + 1) * (radius * radius) + x * radius + z] == 0 
               || map[y * (radius * radius) + (x + 1) * radius + z] == 0
               || map[y * (radius * radius) + x * radius + (z + 1)] == 0
@@ -1070,23 +1288,6 @@ sendEvent('page_view');
       }
       displayInformation(speech);
     }
-    // Send data
-    document.getElementById('dataForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const message = document.getElementById('userInput').value;
-
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ message })
-      });
-
-      const result = await res.json();
-      alert(result.status);
-
-      });
 
       document.getElementById("downloadSurface").addEventListener("click", function () {
         let text = "";
@@ -1097,9 +1298,9 @@ sendEvent('page_view');
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "sample.txt";
+        a.download = "surface.txt";
         a.click();
-        URL.revokeObjectURL(url); // cleanup
+        URL.revokeObjectURL(url);
       });
   </script>
 </body>
